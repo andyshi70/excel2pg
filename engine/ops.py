@@ -147,4 +147,15 @@ def verify_match(conn, spec) -> dict:
 
 
 def backup_name(table: str) -> str:
-    return f"{table}_bak_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return f"{table}_bak_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+
+
+def vlookup_multihit(conn, spec) -> int:
+    """vlookup 黄条：对照表命中>1 的主表行数（只读）。"""
+    from .match import vlookup_multihit_sql
+
+    cur = conn.cursor()
+    cur.execute(vlookup_multihit_sql(spec))
+    n = cur.fetchone()[0]
+    conn.rollback()
+    return n

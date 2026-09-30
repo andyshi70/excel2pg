@@ -8,16 +8,20 @@ from dotenv import load_dotenv
 ENV_PATH = "/Users/evandy/excel2pg/.env"
 
 
-@contextmanager
-def connect():
+def get_conn():
     load_dotenv(ENV_PATH)
-    conn = psycopg2.connect(
+    return psycopg2.connect(
         host=os.environ["PGHOST"],
         port=os.environ["PGPORT"],
         dbname=os.environ["PGDATABASE"],
         user=os.environ["PGUSER"],
         password=os.environ["PGPASSWORD"],
     )
+
+
+@contextmanager
+def connect():
+    conn = get_conn()
     try:
         yield conn
     finally:
