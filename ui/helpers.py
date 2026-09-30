@@ -21,8 +21,34 @@ def read_df(conn, sql, params=None) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
+def ordered_columns(conn, table: str) -> list:
+    """表内真实列顺序（Excel 的列序数就是它），不按字母排。"""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema='public' AND table_name=%s ORDER BY ordinal_position",
+        (table,),
+    )
+    cols = [r[0] for r in cur.fetchall()]
+    conn.rollback()
+    return cols
+
+
+def code_order(cols: list) -> list:
+    """展示排序键：名字像代码的列（「代码」优先，其次按列序数；排除证件号码这类号码列）。"""
+    codes = [c for c in cols if "码" in c and "号码" not in c]
+    return sorted(codes, key=lambda c: (c != "代码", cols.index(c)))
+
+
+def order_clause(cols: list, prefix: str = "") -> str:
+    """ORDER BY 后面的键列表（不含关键字），多表拼接后统一加一次 ORDER BY。"""
+    return ", ".join(f"{prefix}{qi(c)} NULLS LAST" for c in code_order(cols))
+
+
 def table_head(conn, table: str, n: int = 50) -> pd.DataFrame:
-    return read_df(conn, f"SELECT * FROM {qi(table)} LIMIT {int(n)}")
+    oc = order_clause(ordered_columns(conn, table))
+    sql = f"SELECT * FROM {qi(table)}" + (f" ORDER BY {oc}" if oc else "") + f" LIMIT {int(n)}"
+    return read_df(conn, sql)
 
 
 def distinct_values(conn, table: str, col: str, limit: int = 300) -> list:
@@ -82,4 +108,5 @@ __all__ = [
     "connect", "list_tables", "ui_tables", "columns", "qi",
     "read_df", "table_head", "distinct_values", "table_shape",
     "missing_targets", "default_target", "df_to_xlsx",
+    "ordered_columns", "code_order", "order_clause",
 ]

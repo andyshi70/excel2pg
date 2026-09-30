@@ -9,7 +9,8 @@ from engine.ops import backup_name, dry_run, validate, vlookup_multihit, writeba
 
 from . import store
 from .errors import humanize
-from .helpers import default_target, distinct_values, read_df, ui_tables
+from .helpers import (default_target, distinct_values, order_clause,
+                      ordered_columns, read_df, ui_tables)
 
 STEPS = {
     "count": ["选主表", "选对照表", "对应字段", "统计范围", "写到哪一列", "可选筛选", "确认执行"],
@@ -166,9 +167,39 @@ def _step_body(w: dict, conn):
             help="把候补、未录取也算上会把数字抬高；你以前的口径 = 只数录取+专项录取。",
         )
     elif step == "带出哪一列":
-        s_cols = sorted(columns(conn, w["src"]))
-        cur = w["fill_col"] if w["fill_col"] in s_cols else s_cols[0]
-        w["fill_col"] = st.selectbox(f"把「{w['src']}」的哪一列带过来？", s_cols, index=s_cols.index(cur))
+        s_cols = ordered_columns(conn, w["src"])  # 表内真实列顺序 = Excel 列序数
+        opts = [f"第{i}列 · {c}" for i, c in enumerate(s_cols, 1)]
+        base = s_cols.index(w["fill_col"]) if w["fill_col"] in s_cols else 0
+
+        # 换过对照表时状态可能越界 → 清掉走默认
+        if "fill_ord" in st.session_state and not (1 <= st.session_state["fill_ord"] <= len(s_cols)):
+            for k in ("fill_ord", "fill_pick", "_fill_ord_prev"):
+                st.session_state.pop(k, None)
+        if "fill_pick" in st.session_state and st.session_state["fill_pick"] not in opts:
+            for k in ("fill_pick", "_fill_ord_prev"):
+                st.session_state.pop(k, None)
+
+        # 下拉改了 → 数字跟着变（必须在 number_input 渲染前写）
+        if "fill_pick" in st.session_state and "fill_ord" in st.session_state:
+            pi = opts.index(st.session_state["fill_pick"])
+            if opts[st.session_state["fill_ord"] - 1] != opts[pi]:
+                st.session_state["fill_ord"] = pi + 1
+                st.session_state["_fill_ord_prev"] = pi + 1
+
+        if "fill_ord" not in st.session_state:
+            st.session_state["fill_ord"] = base + 1
+        n = st.number_input(
+            "直接填列序数（1 = 第1列，就是 Excel VLOOKUP 里那个「第几列」）",
+            min_value=1, max_value=len(s_cols), step=1, key="fill_ord",
+        )
+        if st.session_state.get("_fill_ord_prev") not in (None, n):
+            st.session_state["fill_pick"] = opts[n - 1]  # 数字改了 → 下拉跳过去
+        st.session_state["_fill_ord_prev"] = n
+        pick = st.selectbox(
+            f"把「{w['src']}」的哪一列带过来？（第N列 = 表里真实列序数）", opts,
+            index=base, key="fill_pick",
+        )
+        w["fill_col"] = s_cols[opts.index(pick)]
         w["default"] = st.text_input("对不上时填什么？（留空 = 空着）", value=w["default"])
     elif step == "写到哪一列":
         st.caption("选已有列 = 覆盖旧值；也可以新建一列。")
@@ -253,6 +284,9 @@ def _execute(w: dict, conn, plans):
             if w.get("filter_col") and w.get("filter_values"):
                 df_sql += f" WHERE {qi(w['filter_col'])} IN ({','.join(['%s'] * len(w['filter_values']))})"
                 params = w["filter_values"]
+            oc = order_clause(ordered_columns(conn, t))
+            if oc:  # 全量展示按代码排序
+                df_sql += f" ORDER BY {oc}"
             df = read_df(conn, df_sql, params or None)
             dist = dict(st_wb["distribution"])
             if spec["kind"] == "count":

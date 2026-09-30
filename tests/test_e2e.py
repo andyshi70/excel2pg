@@ -78,6 +78,16 @@ def open_state():
 ORIG_OPEN = open_state()
 print(f"[OK] 开放情况初始状态: 硕士={ORIG_OPEN[0]} 直博={ORIG_OPEN[1]}")
 
+
+def assert_code_sorted(df, table, label):
+    """全量展示规则：按代码列升序、空值在后（与界面 ORDER BY 同口径）。"""
+    from ui.helpers import code_order, ordered_columns
+    with connect() as c:
+        keys = code_order(ordered_columns(c, table))
+    got = df[keys].reset_index(drop=True)
+    want = df.sort_values(keys, kind="stable", na_position="last").reset_index(drop=True)[keys]
+    assert got.equals(want), f"{label} 未按代码排序，键={keys}"
+
 # ---- 走「判断在不在」向导
 btn("✅ 判断在不在").click().run()
 assert not at.exception, at.exception
@@ -148,6 +158,8 @@ assert not at.exception, at.exception
 qr = at.session_state.get("q_result")
 assert qr and qr["total"] == 501, qr
 print(f"[OK] 单表查询: total={qr['total']}")
+assert_code_sorted(qr["df"], "硕士", "单表查询结果")
+print("[OK] 查询结果按代码排序")
 
 # ---- 连表查询 + 条件（真库 SQL，只读）
 cb = next(x for x in at.checkbox if x.label == "再连一张表一起查")
@@ -200,6 +212,8 @@ assert all(r["changed"] == 0 for r in rc), [(r["table"], r["changed"]) for r in 
 print(f"[OK] 计数向导执行（幂等）: {[(r['table'], r['target'], r['zero']) for r in rc]}")
 assert any(r["zero"] > 0 for r in rc), "0命中统计缺失"
 print(f"[OK] 0命中统计: {[(r['table'], r['zero']) for r in rc]}")
+assert_code_sorted(rc[0]["df"], rc[0]["table"], "计算结果")
+print("[OK] 计算结果全量展示按代码排序")
 
 # ---- 「补一列」vlookup（新建列 + 执行 + 清理痕迹）
 btn("↩ 回到首页，做下一个操作").click().run()
@@ -211,7 +225,15 @@ ms("右边：二轮推免开放目录 的字段").set_value(
     ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"]
 ).run()
 btn("下一步 →").click().run()  # 带出哪一列
-sb(f"把「二轮推免开放目录」的哪一列带过来？").set_value("三级学科").run()
+# 列序数标签（第N列 = 表内真实列顺序，Excel 序数口径）
+from ui.helpers import ordered_columns  # noqa: E402
+
+with connect() as _c:
+    _src_cols = ordered_columns(_c, "二轮推免开放目录")
+_fill_label = f"第{_src_cols.index('三级学科') + 1}列 · 三级学科"
+sb("把「二轮推免开放目录」的哪一列带过来？（第N列 = 表里真实列序数）").set_value(_fill_label).run()
+assert not at.exception, at.exception
+print(f"[OK] vlookup 带出列可按列序数选择: {_fill_label}")
 btn("下一步 →").click().run()  # 写到哪一列 → 默认新建
 next(t for t in at.text_input if "硕士」：新列" in t.label).set_value("测试带出列")
 next(t for t in at.text_input if "直博」：新列" in t.label).set_value("测试带出列").run()

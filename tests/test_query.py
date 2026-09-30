@@ -86,4 +86,23 @@ with connect() as conn:
     sql_i, par_i = build_query(spec_i, cols_a, [])
     assert "DROP" not in sql_i and par_i == ["'; DROP TABLE 硕士; --"]
 
+    # 10) 全量展示排序规则：查询带 ORDER BY（在 LIMIT 前），count 永不带排序
+    from ui.helpers import code_order, ordered_columns, order_clause
+    with connect() as c2:
+        oa = ordered_columns(c2, A)
+        ob = ordered_columns(c2, B)
+    assert code_order(oa)[:1] == ["代码"], code_order(oa)
+    order_by = " ORDER BY " + ", ".join(p for p in (order_clause(oa, "a."), order_clause(ob, "b.")) if p)
+    assert 'a."代码" NULLS LAST' in order_by, order_by
+    spec_o = {"a_table": A, "b_table": B, "join": "left", "pairs": PAIRS, "conds": []}
+    sql_o, _ = build_query(spec_o, cols_a, cols_b, limit=5001, order_by=order_by)
+    assert "ORDER BY" in sql_o and sql_o.index("ORDER BY") < sql_o.index("LIMIT"), sql_o[-200:]
+    csql_o, _ = count_sql(spec_o, cols_a, cols_b)
+    assert "ORDER BY" not in csql_o, csql_o
+    # 真跑一遍：按代码列单调不降（数值列直接比）
+    df_o = read_df(conn, sql_o, None)
+    codes = df_o["代码"].dropna().tolist()
+    assert codes == sorted(codes), "结果未按代码升序"
+    print(f"[OK] ORDER BY 接线：查询带排序（代码升序 {codes[0]}→{codes[-1]}）、count 不带")
+
 print("test_query: ALL PASS")

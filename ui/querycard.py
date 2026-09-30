@@ -7,7 +7,8 @@ from engine.db import columns, qi
 from engine.match import pair_pred
 
 from .errors import humanize
-from .helpers import df_to_xlsx, distinct_values, read_df, ui_tables
+from .helpers import (df_to_xlsx, distinct_values, order_clause,
+                      ordered_columns, read_df, ui_tables)
 from .querysql import JOIN_LABELS, OP_BY_LABEL, OPS, build_query, count_sql
 
 LIMIT = 5001  # 多取 1 行用于判断是否超限
@@ -121,7 +122,13 @@ def render(conn):
                 "conds": [c for c in q["conds"]],
             }
             bcols = sorted(columns(conn, q["b"])) if q["use_b"] else []
-            sql, params = build_query(spec, a_cols, bcols, limit=LIMIT)
+            # 全量展示按代码列排序（规则 2026-09-30）；count 不带排序
+            parts = [order_clause(ordered_columns(conn, q["a"]), "a.")]
+            if q["use_b"]:
+                parts.append(order_clause(ordered_columns(conn, q["b"]), "b."))
+            parts = [p for p in parts if p]
+            order_by = f" ORDER BY {', '.join(parts)}" if parts else ""
+            sql, params = build_query(spec, a_cols, bcols, limit=LIMIT, order_by=order_by)
             df = read_df(conn, sql, params)
             csql, cparams = count_sql(spec, a_cols, bcols)
             total = read_df(conn, csql, cparams).iloc[0, 0]

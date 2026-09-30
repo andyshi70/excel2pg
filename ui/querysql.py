@@ -18,9 +18,9 @@ OPS = [
 OP_BY_LABEL = dict(OPS)
 
 
-def build_query(spec, a_cols, b_cols, limit=None):
+def build_query(spec, a_cols, b_cols, limit=None, order_by=""):
     """spec: {a_table, b_table|None, join, pairs, conds:[{side,col,op,vals}]}
-    返回 (sql, params)。conds 为空 = 无条件。"""
+    返回 (sql, params)。conds 为空 = 无条件。order_by = 调用方给好的 ORDER BY 子句（含前导空格）。"""
     sel = [f"a.{qi(c)}" for c in a_cols]
     if spec.get("b_table"):
         for c in b_cols:
@@ -55,6 +55,8 @@ def build_query(spec, a_cols, b_cols, limit=None):
             where.append(f"{ref} BETWEEN %s AND %s"); params.extend(vals[:2])
     if where:
         sql += " WHERE " + " AND ".join(where)
+    if order_by:
+        sql += order_by
     if limit:
         sql += f" LIMIT {int(limit)}"
     return sql, params
