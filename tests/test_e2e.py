@@ -33,6 +33,39 @@ def sb(label):
     raise AssertionError(f"下拉没找到: {label}  现有: {[s.label for s in at.selectbox]}")
 
 
+def tick(prefix, cols):
+    """勾选字段（顺序=勾选顺序）；已勾的跳过（保留原顺序）。"""
+    for c in cols:
+        k = f"{prefix}::{c}"
+        box = next((x for x in at.checkbox if x.key == k), None)
+        assert box is not None, f"勾选框没找到: {k}  现有: {[x.key for x in at.checkbox]}"
+        if not box.value:
+            box.set_value(True).run()
+            assert not at.exception, at.exception
+
+
+# ---- 勾选顺序 = 配对顺序（独立新会话，不污染主流程）
+at2 = AppTest.from_file(os.path.join(ROOT, "app.py"), default_timeout=60)
+at2.run()
+assert not at2.exception, at2.exception
+for lbl in ("📋 Vlookup", "下一步 →", "下一步 →"):
+    next(b for b in at2.button if b.label == lbl).click().run()
+assert not at2.exception, at2.exception
+_left_t = ["学位类型", "专业码", "研究方向", "指导教师"]
+_right_t = ["指导教师", "研究方向（文字应尽量精简，不超过20个字）", "专业码", "学位类型"]
+for side, cols in (("pcol_a", _left_t), ("pcol_b", _right_t)):
+    for c in cols:
+        k = f"{side}::{c}"
+        box = next(x for x in at2.checkbox if x.key == k)
+        box.set_value(True).run()
+assert not at2.exception, at2.exception
+_info = [i.value for i in at2.info if "配对关系" in i.value]
+_expect = "\n\n".join(f"{i+1}. {a} ↔ {b}" for i, (a, b) in enumerate(zip(_left_t, _right_t)))
+assert _info and _expect in _info[0], f"配对没按勾选顺序:\n实际={_info}\n期望={_expect}"
+print("[OK] 勾选顺序=配对顺序（右侧倒序勾也按点的顺序配对）")
+del at2
+
+
 # ---- 首页：四张卡片都在
 labels = [b.label for b in at.button]
 for need in ("🔍 查数据", "📋 Vlookup", "✅ 判断在不在", "🔢 数出现次数"):
@@ -114,10 +147,8 @@ print("[OK] 步2 对照表预填 二轮推免开放目录")
 
 btn("下一步 →").click().run()
 assert not at.exception, at.exception
-ms("左边：硕士、直博 的字段").set_value(["学位类型", "专业码", "研究方向", "指导教师"])
-ms("右边：二轮推免开放目录 的字段").set_value(
-    ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"]
-).run()
+tick("pcol_a", ["学位类型", "专业码", "研究方向", "指导教师"])
+tick("pcol_b", ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"])
 assert not at.exception, at.exception
 assert any("4. 指导教师 ↔ 指导教师" in m.value for m in at.info), [m.value for m in at.info]
 print("[OK] 步3 字段配对（4对，含长列名）")
@@ -201,10 +232,8 @@ btn("🔢 数出现次数").click().run()
 assert any("第 1/7 步" in s.value for s in at.subheader), [s.value for s in at.subheader]
 for _ in range(2):  # 主表 → 对照表 → 配对
     btn("下一步 →").click().run()
-ms("左边：硕士、直博 的字段").set_value(["学位类型", "专业码", "研究方向", "指导教师"])
-ms("右边：总0924 的字段").set_value(
-    ["录取类型", "录取专业代码", "录取研究方向（2027年目录方向）", "导师姓名"]
-).run()
+tick("pcol_a", ["学位类型", "专业码", "研究方向", "指导教师"])
+tick("pcol_b", ["录取类型", "录取专业代码", "录取研究方向（2027年目录方向）", "导师姓名"])
 btn("下一步 →").click().run()  # 统计范围（默认 录取+专项录取）
 assert not at.exception, at.exception
 sv = next(m for m in at.multiselect if m.label.startswith("只数哪些状态"))
@@ -232,10 +261,8 @@ btn("↩ 回到首页，做下一个操作").click().run()
 btn("📋 Vlookup").click().run()
 btn("下一步 →").click().run()
 btn("下一步 →").click().run()  # 对照表默认 二轮推免开放目录
-ms("左边：硕士、直博 的字段").set_value(["学位类型", "专业码", "研究方向", "指导教师"])
-ms("右边：二轮推免开放目录 的字段").set_value(
-    ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"]
-).run()
+tick("pcol_a", ["学位类型", "专业码", "研究方向", "指导教师"])
+tick("pcol_b", ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"])
 assert not at.exception, at.exception
 # 匹配方式：默认精确，页面可切模糊（本次用宽松跑全流程）
 _mbox = sb("怎么算「对上了」？（匹配方式）")
@@ -250,9 +277,11 @@ from ui.helpers import ordered_columns  # noqa: E402
 with connect() as _c:
     _src_cols = ordered_columns(_c, "二轮推免开放目录")
 _fill_label = f"第{_src_cols.index('三级学科') + 1}列 · 三级学科"
-sb("把「二轮推免开放目录」的哪一列带过来？（第N列 = 表里真实列序数）").set_value(_fill_label).run()
+sb("把「二轮推免开放目录」的哪一列带过来？（第N列 = 表里真实列序数，取值按列名）").set_value(_fill_label).run()
 assert not at.exception, at.exception
 print(f"[OK] vlookup 带出列可按列序数选择: {_fill_label}")
+assert len(at.number_input) == 0, "「直接填列序数」输入框应已删除（取值按列名，序数只是标签）"
+print("[OK] 列序数输入框已删除（下拉按 第N列·列名 选，取值按列名）")
 btn("下一步 →").click().run()  # 写到哪一列 → 默认新建
 next(t for t in at.text_input if "硕士」：新列" in t.label).set_value("测试带出列")
 next(t for t in at.text_input if "直博」：新列" in t.label).set_value("测试带出列").run()

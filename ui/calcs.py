@@ -37,6 +37,38 @@ MODE_PHRASE = {
 }
 
 
+def _toggle_order(order_key, ck, opt):
+    """勾/取消勾时维护勾选顺序（顺序 = 配对顺序）。"""
+    order = st.session_state.get(order_key, [])
+    if st.session_state.get(ck):
+        if opt not in order:
+            order.append(opt)
+    else:
+        order = [o for o in order if o != opt]
+    st.session_state[order_key] = order
+
+
+def checkbox_multi(label, options, selected, key):
+    """两栏勾选框多选：列表常驻直接勾，不用反复开下拉。返回勾选顺序列表（= 配对顺序）。"""
+    st.caption(label)
+    order_key, prefix = f"{key}__order", f"{key}::"
+    # 换过字段集（切表）→ 旧勾选作废，按预填重建
+    if st.session_state.get(f"{key}__sig") != tuple(options):
+        for k in [k for k in st.session_state if k.startswith(prefix)]:
+            st.session_state.pop(k)
+        st.session_state.pop(order_key, None)
+        st.session_state[f"{key}__sig"] = tuple(options)
+        st.session_state[order_key] = [o for o in selected if o in options]
+    order = st.session_state.setdefault(order_key, [])
+    cols = st.columns(2)
+    for i, opt in enumerate(options):
+        ck = f"{prefix}{opt}"
+        st.session_state.setdefault(ck, opt in order)
+        with cols[i % 2]:
+            st.checkbox(opt, key=ck, on_change=_toggle_order, args=(order_key, ck, opt))
+    return [o for o in order if o in options]
+
+
 def new_wiz(kind: str, tables: list) -> dict:
     saved = store.load().get(kind, {})
     src = saved.get("src")
@@ -152,12 +184,14 @@ def _step_body(w: dict, conn):
         cur = w["src"] if w["src"] in opts else opts[0]
         w["src"] = st.selectbox("对照表", opts, index=opts.index(cur))
     elif step == "对应字段":
-        st.caption("两边各选几个字段，**按勾选顺序一一对应**（字段名不一样没关系，比如左边「研究方向」对应右边「录取研究方向（2027年目录方向）」）。")
+        st.caption("两边各勾几个字段，**按勾选顺序一一对应**（字段名不一样没关系，比如左边「研究方向」对应右边「录取研究方向（2027年目录方向）」）。")
         a_sets = [set(columns(conn, t)) for t in w["a_tables"]]
         common = sorted(set.intersection(*a_sets)) if a_sets else []
         s_cols = sorted(columns(conn, w["src"]))
-        w["a_cols"] = st.multiselect(f"左边：{ '、'.join(w['a_tables']) } 的字段", common, default=[c for c in w["a_cols"] if c in common])
-        w["src_cols"] = st.multiselect(f"右边：{w['src']} 的字段", s_cols, default=[c for c in w["src_cols"] if c in s_cols])
+        w["a_cols"] = checkbox_multi(f"左边：{ '、'.join(w['a_tables']) } 的字段", common,
+                                     [c for c in w["a_cols"] if c in common], "pcol_a")
+        w["src_cols"] = checkbox_multi(f"右边：{w['src']} 的字段", s_cols,
+                                       [c for c in w["src_cols"] if c in s_cols], "pcol_b")
         if len(w["a_cols"]) != len(w["src_cols"]):
             st.warning("两边选的字段数量不一样，顺序对应会错位 —— 数量要相同。")
         elif w["a_cols"]:
@@ -192,35 +226,10 @@ def _step_body(w: dict, conn):
     elif step == "带出哪一列":
         s_cols = ordered_columns(conn, w["src"])  # 表内真实列顺序 = Excel 列序数
         opts = [f"第{i}列 · {c}" for i, c in enumerate(s_cols, 1)]
-        base = s_cols.index(w["fill_col"]) if w["fill_col"] in s_cols else 0
-
-        # 换过对照表时状态可能越界 → 清掉走默认
-        if "fill_ord" in st.session_state and not (1 <= st.session_state["fill_ord"] <= len(s_cols)):
-            for k in ("fill_ord", "fill_pick", "_fill_ord_prev"):
-                st.session_state.pop(k, None)
-        if "fill_pick" in st.session_state and st.session_state["fill_pick"] not in opts:
-            for k in ("fill_pick", "_fill_ord_prev"):
-                st.session_state.pop(k, None)
-
-        # 下拉改了 → 数字跟着变（必须在 number_input 渲染前写）
-        if "fill_pick" in st.session_state and "fill_ord" in st.session_state:
-            pi = opts.index(st.session_state["fill_pick"])
-            if opts[st.session_state["fill_ord"] - 1] != opts[pi]:
-                st.session_state["fill_ord"] = pi + 1
-                st.session_state["_fill_ord_prev"] = pi + 1
-
-        if "fill_ord" not in st.session_state:
-            st.session_state["fill_ord"] = base + 1
-        n = st.number_input(
-            "直接填列序数（1 = 第1列，就是 Excel VLOOKUP 里那个「第几列」）",
-            min_value=1, max_value=len(s_cols), step=1, key="fill_ord",
-        )
-        if st.session_state.get("_fill_ord_prev") not in (None, n):
-            st.session_state["fill_pick"] = opts[n - 1]  # 数字改了 → 下拉跳过去
-        st.session_state["_fill_ord_prev"] = n
+        cur = opts[s_cols.index(w["fill_col"])] if w["fill_col"] in s_cols else opts[0]
         pick = st.selectbox(
-            f"把「{w['src']}」的哪一列带过来？（第N列 = 表里真实列序数）", opts,
-            index=base, key="fill_pick",
+            f"把「{w['src']}」的哪一列带过来？（第N列 = 表里真实列序数，取值按列名）", opts,
+            index=opts.index(cur),
         )
         w["fill_col"] = s_cols[opts.index(pick)]
         w["default"] = st.text_input("对不上时填什么？（留空 = 空着）", value=w["default"])
