@@ -73,6 +73,7 @@ def _results_right():
         querycard.render_result(st.session_state.q_result)
     else:
         st.caption("结果会显示在这里。")
+        st.caption("👆 先在中间点一张卡片开跑；执行结果、提示和 Excel 下载都会出现在这一栏。")
 
 
 def main():

@@ -1,0 +1,7 @@
+# 主题锁定（taste-skill 审计项）：
+# - 内部数据工具，单一亮色主题显式锁定，不随 Streamlit 升级漂移
+# - 单一强调色（深青绿），白字对比度 ≈5.3:1 过 WCAG AA；不用默认红，不用 AI 紫
+[theme]
+base = "light"
+primaryColor = "#0F766E"
+font = "sans serif"
