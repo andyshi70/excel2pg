@@ -134,6 +134,10 @@ Build 根据任务需要按需使用。
 - `taste-skill`：UI / 视觉设计时
 - `grill-me`：需要检查对代码或架构的真实理解时
 
+### 用户触发词映射
+
+- **`grillme`** → 调用 `grill-with-docs` 技能（追问 + 记录术语/ADR）
+
 Superpowers 可以保留安装并保持可发现，但不要把 Superpowers 变成每个任务都必须执行的流程。
 
 ## Token 统计
@@ -171,7 +175,15 @@ python3 tools/usage.py -s <id> --caveman
 
 ⚠️ **诚实声明：caveman 节省无法精确测量。** 因为没有"不开 caveman 的对照组"，无法知道模型原本会输出多少。`--caveman` 基于 caveman 声称的典型 65% 输出压缩率给出估算区间（55%-70%），是估算值，不是精确数据。
 
-对话 token、RTK 节省、caveman 节省是三个不同层面，不要混为一谈。
+### Ponytail 节省（估算）
+
+```text
+python3 tools/usage.py -s <id> --ponytail
+```
+
+⚠️ **诚实声明：ponytail 节省无法精确测量，且压缩范围更窄。** ponytail 只压缩解释性文字（code first, 解释最多三行），不压缩代码本身；且 ponytail 没有官方压缩率声明。`--ponytail` 采用保守中心 50% 估算区间（40%-60%），是估算值，不是精确数据。实际节省通常低于 caveman。
+
+对话 token、RTK 节省、caveman 节省、ponytail 节省是四个不同层面，不要混为一谈。
 
 ### 看消耗（触发规则）
 
@@ -181,9 +193,10 @@ python3 tools/usage.py -s <id> --caveman
 python3 tools/usage.py --day        # 当天对话 token 消耗汇总
 rtk gain                           # RTK 命令层节省（总节省 + top 命令）
 python3 tools/usage.py --caveman    # caveman 节省估算（若有指定 session 用 -s <id>）
+python3 tools/usage.py --ponytail   # ponytail 节省估算（估算，通常低于 caveman）
 ```
 
-汇报时把三层面数据并列展示，并明确标注 caveman 是估算。
+汇报时把四层面数据并列展示，并明确标注 caveman、ponytail 是估算。
 
 ## 7. 测试与验证
 
@@ -352,6 +365,10 @@ git status
 STATE 只记录：当前目标、当前阶段、已完成、进行中、阻塞、下一步、重要风险。
 
 不要写成聊天记录。
+
+长任务在关键里程碑更新 STATE.md。
+任务中断后先检查 Git 和实际代码状态，再根据 STATE.md 恢复。
+不得重复已经完成的工作，以实际代码和 Git 状态为准。
 
 ## 14. 断电恢复
 
