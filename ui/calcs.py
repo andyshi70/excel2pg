@@ -20,7 +20,7 @@ STEPS = {
 TITLE = {
     "count": "数出现次数：数数招了几个人",
     "exists": "判断在不在：是 / 否",
-    "vlookup": "补一列：从对照表带个值过来",
+    "vlookup": "Vlookup：从对照表带个值过来",
 }
 DEFAULT_SRC = {"count": ["总0924", "录取+候补0922"], "exists": ["二轮推免开放目录"], "vlookup": ["二轮推免开放目录", "总0924"]}
 

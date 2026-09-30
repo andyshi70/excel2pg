@@ -35,7 +35,7 @@ def sb(label):
 
 # ---- 首页：四张卡片都在
 labels = [b.label for b in at.button]
-for need in ("🔍 查数据", "📋 补一列", "✅ 判断在不在", "🔢 数出现次数"):
+for need in ("🔍 查数据", "📋 Vlookup", "✅ 判断在不在", "🔢 数出现次数"):
     assert need in labels, f"缺少卡片 {need}: {labels}"
 print("[OK] 首页四张卡片齐全")
 
@@ -49,6 +49,18 @@ print("[OK] 首屏无 SQL/JOIN/主键/公式 禁词")
 sidebar_sel = next(s for s in at.selectbox if s.label == "点一张表看看")
 assert not any("_bak_" in o for o in sidebar_sel.options), sidebar_sel.options
 print(f"[OK] 左栏表列表已隐藏备份表（可见 {len(sidebar_sel.options)} 张）")
+
+# ---- 导入按钮：存在；目录为空时点击给引导（不触发真导入）
+assert "📥 导入 Excel 数据" in [b.label for b in at.button], [b.label for b in at.button]
+from pathlib import Path  # noqa: E402
+
+if not list(Path("/Users/evandy/excel2pg/src/excel").glob("*.xls*")):
+    btn("📥 导入 Excel 数据").click().run()
+    assert not at.exception, at.exception
+    assert any("目录里还没有 Excel" in w.value for w in at.warning), [w.value for w in at.warning]
+    print("[OK] 导入按钮：空目录点击 → 人话引导")
+else:
+    print("[OK] 导入按钮存在（目录有 Excel，跳过点击避免测试触发真导入）")
 
 # ---- 记录「开放情况」两列的初始状态（规则：默认放空，只有判断卡片会碰它）
 from engine.db import connect, qi  # noqa: E402
@@ -215,9 +227,9 @@ print(f"[OK] 0命中统计: {[(r['table'], r['zero']) for r in rc]}")
 assert_code_sorted(rc[0]["df"], rc[0]["table"], "计算结果")
 print("[OK] 计算结果全量展示按代码排序")
 
-# ---- 「补一列」vlookup（新建列 + 执行 + 清理痕迹）
+# ---- 「Vlookup」vlookup（新建列 + 执行 + 清理痕迹）
 btn("↩ 回到首页，做下一个操作").click().run()
-btn("📋 补一列").click().run()
+btn("📋 Vlookup").click().run()
 btn("下一步 →").click().run()
 btn("下一步 →").click().run()  # 对照表默认 二轮推免开放目录
 ms("左边：硕士、直博 的字段").set_value(["学位类型", "专业码", "研究方向", "指导教师"])

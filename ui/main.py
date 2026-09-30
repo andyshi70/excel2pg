@@ -1,5 +1,8 @@
-"""入口：三栏布局（左=表列表/预览，中=操作向导，右=结果）。"""
+"""入口：三栏布局（左=表列表/预览+导入Excel，中=操作向导，右=结果）。"""
 import logging
+import subprocess
+import sys
+from pathlib import Path
 
 import streamlit as st
 
@@ -9,9 +12,13 @@ from ui.errors import MESSAGES, humanize
 from ui.helpers import (columns, df_to_xlsx, distinct_values, missing_targets,
                         table_head, table_shape, ui_tables)
 
+EXCEL2PG = Path("/Users/evandy/excel2pg")
+IMPORTER = EXCEL2PG / "src" / "importer.py"
+EXCEL_DIR = EXCEL2PG / "src" / "excel"
+
 CARDS = [
     ("query", "🔍 查数据", "只读：单表或连一张表查，条件随便加，不改数据库"),
-    ("vlookup", "📋 补一列", "对照另一张表，把某个值带过来填进新列（类似 VLOOKUP）"),
+    ("vlookup", "📋 Vlookup", "对照另一张表，把某个值带过来填进新列"),
     ("exists", "✅ 判断在不在", "每个条目去对照表找一找：找到=是，没找到=否"),
     ("count", "🔢 数出现次数", "每个条目在明细表里出现几次，就填几（招了几个人）"),
 ]
@@ -20,6 +27,32 @@ CARDS = [
 def _sidebar(tables, conn):
     with st.sidebar:
         st.header("📁 数据表")
+        if st.button("📥 导入 Excel 数据", use_container_width=True,
+                     help="把要导入的 Excel 放进指定目录，点一下全部导入；同名表会被覆盖"):
+            files = sorted(list(EXCEL_DIR.glob("*.xlsx")) + list(EXCEL_DIR.glob("*.xlsm")))
+            if not files:
+                st.warning(f"目录里还没有 Excel —— 把文件放进 {EXCEL_DIR} 再点按钮。")
+            else:
+                try:
+                    with st.spinner(f"正在导入 {len(files)} 个文件（同名表覆盖重导）…"):
+                        p = subprocess.run(
+                            [sys.executable, str(IMPORTER)],
+                            cwd=str(EXCEL2PG), capture_output=True, text=True, timeout=600,
+                        )
+                except subprocess.TimeoutExpired:
+                    st.error("导入超时（超过 10 分钟），请检查文件是否异常大。")
+                    p = None
+                if p is not None:
+                    out = (p.stdout or "") + (("\n" + p.stderr) if p.stderr else "")
+                    if p.returncode == 0:
+                        tables = ui_tables(conn)  # 同一次运行里刷新表列表
+                        st.success("导入完成，表列表已刷新。")
+                        with st.expander("看导入日志"):
+                            st.code(out[-6000:])
+                    else:
+                        st.error("导入失败，日志如下（表没改坏的部分会保留）。")
+                        st.code(out[-6000:])
+        st.caption(f"Excel 放这里：{EXCEL_DIR}（同名表会被覆盖，导入后记得重跑计算）")
         sel = st.selectbox("点一张表看看", ["（先不看）"] + tables)
         if sel != "（先不看）":
             n, m = table_shape(conn, sel)
