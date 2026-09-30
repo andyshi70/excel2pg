@@ -50,6 +50,34 @@ sidebar_sel = next(s for s in at.selectbox if s.label == "点一张表看看")
 assert not any("_bak_" in o for o in sidebar_sel.options), sidebar_sel.options
 print(f"[OK] 左栏表列表已隐藏备份表（可见 {len(sidebar_sel.options)} 张）")
 
+# ---- 记录「开放情况」两列的初始状态（规则：默认放空，只有判断卡片会碰它）
+from engine.db import connect, qi  # noqa: E402
+
+# 重置向导预填，隔离用户手工配置（结束时本测试会把预填写成两表齐的默认态）
+import json  # noqa: E402
+
+cfg_path = os.path.join(ROOT, ".ui_config.json")
+if os.path.exists(cfg_path):
+    _cfg = json.load(open(cfg_path, encoding="utf-8"))
+    for _k in ("exists", "count", "vlookup"):
+        _cfg.pop(_k, None)
+    json.dump(_cfg, open(cfg_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+
+def open_state():
+    with connect() as c:
+        cur = c.cursor()
+        cur.execute(f'SELECT count({qi("推免目录开放情况")}) FROM {qi("硕士")}')
+        a = cur.fetchone()[0]
+        cur.execute(f'SELECT count({qi("目录开放情况")}) FROM {qi("直博")}')
+        b = cur.fetchone()[0]
+        c.rollback()
+        return a, b
+
+
+ORIG_OPEN = open_state()
+print(f"[OK] 开放情况初始状态: 硕士={ORIG_OPEN[0]} 直博={ORIG_OPEN[1]}")
+
 # ---- 走「判断在不在」向导
 btn("✅ 判断在不在").click().run()
 assert not at.exception, at.exception
@@ -161,8 +189,11 @@ btn("下一步 →").click().run()  # 写到哪一列
 btn("下一步 →").click().run()  # 可选筛选
 btn("下一步 →").click().run()  # 确认
 assert "数每个" in "\n".join(m.value for m in at.markdown), [m.value for m in at.markdown]
+pre_open = open_state()
 btn("确认执行").click().run()
 assert not at.exception, at.exception
+assert open_state() == pre_open, f"数出现次数改动了开放情况列: {pre_open} -> {open_state()}"
+print(f"[OK] 数出现次数未碰开放情况列（保持 {pre_open}）")
 rc = at.session_state["results"]
 assert len(rc) == 2 and all(r["kind"] == "count" for r in rc), rc
 assert all(r["changed"] == 0 for r in rc), [(r["table"], r["changed"]) for r in rc]  # 阶段1已写入，幂等
@@ -195,7 +226,6 @@ assert all(r["target"] == "测试带出列" for r in rv), rv
 print(f"[OK] vlookup 执行: {[(r['table'], r['changed'], r['rows']) for r in rv]}")
 
 # 清理：删测试列 + vlookup 预填配置（不动用户真实列）
-from engine.db import connect, qi  # noqa: E402
 with connect() as c:
     cur = c.cursor()
     for t in ("硕士", "直博"):
@@ -208,5 +238,16 @@ if os.path.exists(cfg_path):
     cfg.pop("vlookup", None)
     json.dump(cfg, open(cfg_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print("[OK] 已清理 vlookup 测试列与配置")
+
+# 清理：若测试前开放情况是空的，把判断卡片测试写入的值也还原为空（规则：默认放空）
+if ORIG_OPEN == (0, 0):
+    with connect() as c:
+        cur = c.cursor()
+        cur.execute(f'UPDATE {qi("硕士")} SET {qi("推免目录开放情况")} = NULL')
+        cur.execute(f'UPDATE {qi("直博")} SET {qi("目录开放情况")} = NULL')
+        c.commit()
+    print(f"[OK] 开放情况列已还原为空（{open_state()}）")
+else:
+    print(f"[OK] 开放情况列原值非空（{ORIG_OPEN}），保留测试结果")
 
 print("test_e2e: ALL PASS")
