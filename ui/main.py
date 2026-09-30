@@ -1,4 +1,6 @@
 """入口：三栏布局（左=表列表/预览，中=操作向导，右=结果）。"""
+import logging
+
 import streamlit as st
 
 from engine.db import get_conn
@@ -28,6 +30,10 @@ def _sidebar(tables, conn):
             if c != "（不看）":
                 vals = distinct_values(conn, sel, c)
                 st.code("\n".join(str(v) for v in vals[:60]) + ("\n…" if len(vals) > 60 else ""))
+        baks = store.load().get("last_backups") or []
+        if baks:
+            with st.expander("🕘 最近的自动备份表（要恢复旧数据时用它们）"):
+                st.code("\n".join(baks[:10]))
 
 
 def _results_right():
@@ -74,11 +80,15 @@ def main():
     st.markdown("## 🗂️ yifan 数据小工具 —— 点一点，答案自己出来")
     for k, v in (("mode", None), ("results", None), ("wiz", None)):
         st.session_state.setdefault(k, v)
+    conn = None
     try:
         conn = get_conn()
         tables = ui_tables(conn)
     except Exception as e:  # noqa: BLE001
+        logging.exception("startup failed")
         st.error(humanize(e))
+        if conn:
+            conn.close()
         return
     try:
         _sidebar(tables, conn)

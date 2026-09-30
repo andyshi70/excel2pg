@@ -1,4 +1,6 @@
 """查询卡片（PRD §四①）：只读，不回写。单/双表 + 三种连接大白话 + 多条件。"""
+import logging
+
 import streamlit as st
 
 from engine.db import columns, qi
@@ -128,6 +130,7 @@ def render(conn):
                 "title": f"{q['a']}" + (f" ⋈ {q['b']}" if q["use_b"] else ""),
             }
         except Exception as e:  # noqa: BLE001
+            logging.exception("query failed")
             st.error(humanize(e))
 
 

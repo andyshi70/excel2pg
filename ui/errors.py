@@ -19,6 +19,8 @@ def humanize(exc) -> str:
     code = getattr(exc, "code", None)
     if code and code in MESSAGES:
         return MESSAGES[code].format(d=getattr(exc, "detail", ""))
+    if type(exc).__name__ == "ConfigMissing":
+        return "找不到数据库配置文件（excel2pg 的 .env），请确认它还在原位置"
     name, msg = type(exc).__name__, str(exc)
     # 锁/超时必须先于 OperationalError 判断（QueryCanceledError 是它的子类）
     if any(k in msg.lower() for k in ("lock timeout", "deadlock", "lock wait")) or "Lock" in name:

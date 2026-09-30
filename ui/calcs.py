@@ -1,4 +1,6 @@
 """三张计算卡片的向导（PRD §四）：一次只问一件事、预填可改、人话确认、事务执行。"""
+import logging
+
 import streamlit as st
 
 from engine import specs as S
@@ -228,6 +230,7 @@ def _render_confirm(w: dict, conn):
             d = dry_run(conn, spec)
             st.caption(f"「{t}」：将更新 {d['changed']} 行；垃圾行跳过 {d['guard_skipped']} 行")
         except Exception as e:  # noqa: BLE001
+            logging.exception("dry_run failed")
             st.error(f"「{t}」：{humanize(e)}")
             return
     if st.button("确认执行", type="primary", key="do_execute"):
@@ -237,12 +240,14 @@ def _render_confirm(w: dict, conn):
 def _execute(w: dict, conn, plans):
     backed = set()
     results = []
+    new_baks = []
     try:
         for t, spec in plans:
             name = backup_name(t) if t not in backed else None
             st_wb = writeback(conn, spec, backup_name=name)
             if name:
                 backed.add(t)
+                new_baks.append(name)
             df_sql = f"SELECT * FROM {qi(t)}"
             params = []
             if w.get("filter_col") and w.get("filter_values"):
@@ -265,10 +270,15 @@ def _execute(w: dict, conn, plans):
                 "rows": len(df), "multihit": multihit, "df": df,
             })
     except Exception as e:  # noqa: BLE001
+        logging.exception("writeback failed")
         st.error(humanize(e))
         st.caption("已整体回滚，你的表没有被改动。")
         return
     _save_cfg(w)
+    if new_baks:
+        cfg = store.load()
+        cfg["last_backups"] = (new_baks + cfg.get("last_backups", []))[:20]
+        store.save(cfg)
     st.session_state.results = results
     st.success(f"完成：{len(results)} 张表已写入。右侧查看结果。")
 

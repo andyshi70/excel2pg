@@ -14,5 +14,7 @@ def load() -> dict:
 
 
 def save(cfg: dict) -> None:
-    with open(PATH, "w", encoding="utf-8") as f:
+    tmp = PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, PATH)  # 原子替换：断电不会写坏配置

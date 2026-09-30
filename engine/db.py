@@ -5,10 +5,16 @@ from contextlib import contextmanager
 import psycopg2
 from dotenv import load_dotenv
 
-ENV_PATH = "/Users/evandy/excel2pg/.env"
+ENV_PATH = os.environ.get("YIFAN_ENV_FILE", "/Users/evandy/excel2pg/.env")
+
+
+class ConfigMissing(Exception):
+    """.env 不在了 —— 换机/移动仓库时给人话，而不是 KeyError。"""
 
 
 def get_conn():
+    if not os.path.exists(ENV_PATH):
+        raise ConfigMissing(f"找不到数据库配置文件 {ENV_PATH}")
     load_dotenv(ENV_PATH)
     return psycopg2.connect(
         host=os.environ["PGHOST"],
