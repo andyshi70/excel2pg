@@ -11,6 +11,7 @@ from engine.match import (
     guard_pred,
     in_filter,
     norm,
+    norm_loose,
     pair_pred,
     vlookup_subquery,
 )
@@ -46,6 +47,19 @@ except ValueError:
 
 # --- 守卫 = 第一配对列 IS NOT NULL
 assert guard_pred(pairs) == 'a."学位类型" IS NOT NULL'
+
+# --- 模糊匹配三档谓词形态
+assert norm_loose('a."x"').startswith("lower(") and "translate(" in norm_loose('a."x"')
+pl = pair_pred(pairs, "a", "c", mode="loose")
+assert "lower(" in pl and "translate(" in pl and pl.count(" AND ") == 1  # 宽松=仍是等值，1 个连接符
+pco = pair_pred(pairs, "a", "c", mode="contains")
+assert pco.count("LIKE") == 4 and pco.count("length(") == 4  # 2 对 × (2 长度守卫 + 2 方向)
+assert "btrim" in pair_pred(pairs, "a", "c")  # 精确默认不变
+try:
+    pair_pred(pairs, mode="fuzzy")
+    raise AssertionError("unknown mode should raise")
+except ValueError:
+    pass
 
 # --- 状态过滤：IN + 值转义
 f = in_filter('c."是否录取"', ["录取", "专项录取"])

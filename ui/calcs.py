@@ -24,6 +24,18 @@ TITLE = {
 }
 DEFAULT_SRC = {"count": ["总0924", "录取+候补0922"], "exists": ["二轮推免开放目录"], "vlookup": ["二轮推免开放目录", "总0924"]}
 
+# vlookup 三档匹配方式（页面可选）
+MODE_OPTS = {
+    "exact": "精确一致（默认，以前的行为）",
+    "loose": "宽松一致：忽略空格、大小写、全半角",
+    "contains": "包含就算：一边包含另一边（文字列用，数字编码列别用）",
+}
+MODE_PHRASE = {
+    "exact": "",
+    "loose": "（按宽松规则比对：忽略空格、大小写、全半角）",
+    "contains": "（按包含规则比对：一边包含另一边就算对上）",
+}
+
 
 def new_wiz(kind: str, tables: list) -> dict:
     saved = store.load().get(kind, {})
@@ -44,6 +56,7 @@ def new_wiz(kind: str, tables: list) -> dict:
         "filter_col": saved.get("filter_col"),
         "filter_values": saved.get("filter_values", []),
         "strip_digits": saved.get("strip_digits", False),
+        "match_mode": saved.get("match_mode", "exact"),
     }
 
 
@@ -78,6 +91,7 @@ def build_spec(w: dict, a_table: str) -> dict:
     if kind == "vlookup":
         spec["fill_col"] = w["fill_col"]
         spec["default"] = w["default"]
+        spec["match_mode"] = w.get("match_mode", "exact")
     return spec
 
 
@@ -90,7 +104,8 @@ def _summary_line(w, a_table, spec) -> str:
     if w["kind"] == "exists":
         return (f"判断「{a_table}」每个「{keys}」在不在「{w['src']}」里，写进「{tgt}」列（是/否）")
     d = w["default"] or "空"
-    return (f"把「{w['src']}」的「{w['fill_col']}」带过来填进「{a_table}」表的「{tgt}」列，对不上的填「{d}」")
+    return (f"把「{w['src']}」的「{w['fill_col']}」带过来填进「{a_table}」表的「{tgt}」列，对不上的填「{d}」"
+            f"{MODE_PHRASE.get(w.get('match_mode', 'exact'), '')}")
 
 
 def _save_cfg(w: dict):
@@ -153,6 +168,14 @@ def _step_body(w: dict, conn):
             value=w["strip_digits"],
             help="只对导师/教师/姓名类字段生效，绝不会动专业码这类数字字段。默认关：你以前的算法没开它。",
         )
+        if kind == "vlookup":
+            w["match_mode"] = st.selectbox(
+                "怎么算「对上了」？（匹配方式）",
+                list(MODE_OPTS), format_func=lambda k: MODE_OPTS[k],
+                index=list(MODE_OPTS).index(w.get("match_mode", "exact")),
+                help="精确=两边一模一样才算对上。宽松=写法差个空格/大小写/全半角也算。"
+                     "包含=一边装着另一边就算（注意：数字编码列别用，1002 会误配 100210）。",
+            )
     elif step == "统计范围":
         s_cols = sorted(columns(conn, w["src"]))
         default_status = "是否录取" if "是否录取" in s_cols else s_cols[0]

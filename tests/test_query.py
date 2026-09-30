@@ -105,4 +105,22 @@ with connect() as conn:
     assert codes == sorted(codes), "结果未按代码升序"
     print(f"[OK] ORDER BY 接线：查询带排序（代码升序 {codes[0]}→{codes[-1]}）、count 不带")
 
+    # 11) 模糊匹配真实语义（字面量行，不碰业务表）
+    from engine.match import pair_pred as _pp
+
+    def hits(x, y, mode):
+        sql = (f"SELECT count(*) FROM (SELECT '{x}'::text k1) t1, "
+               f"(SELECT '{y}'::text k2) t2 WHERE "
+               + _pp([("k1", "k2")], "t1", "t2", mode=mode))
+        return int(read_df(conn, sql).iloc[0, 0])
+
+    assert hits("Ａ 学硕", "a学硕", "exact") == 0              # 全角/空格/大小写差异：精确不中
+    assert hits("Ａ 学硕", "a学硕", "loose") == 1               # 宽松：中
+    assert hits("张三", " 张三 ", "loose") == 1                 # 首尾空格：宽松中（精确也不中已覆盖）
+    assert hits("肿瘤学", "肿瘤学（专业学位）", "exact") == 0    # 精确：不中
+    assert hits("肿瘤学", "肿瘤学（专业学位）", "contains") == 1  # 包含：中
+    assert hits("", "任意", "contains") == 0                    # 空键不通配
+    assert hits("1002", "100210", "contains") == 1              # 数字码误配 → help 警告属实
+    print("[OK] 模糊匹配：宽松中、包含中、空键不通配、数字码误配已知")
+
 print("test_query: ALL PASS")

@@ -236,6 +236,13 @@ ms("左边：硕士、直博 的字段").set_value(["学位类型", "专业码",
 ms("右边：二轮推免开放目录 的字段").set_value(
     ["学位类型", "专业码", "研究方向（文字应尽量精简，不超过20个字）", "指导教师"]
 ).run()
+assert not at.exception, at.exception
+# 匹配方式：默认精确，页面可切模糊（本次用宽松跑全流程）
+_mbox = sb("怎么算「对上了」？（匹配方式）")
+assert _mbox.value == "exact", _mbox.value
+_mbox.set_value("loose").run()
+assert not at.exception, at.exception
+print("[OK] vlookup 匹配方式默认精确、可切宽松（本次按宽松跑）")
 btn("下一步 →").click().run()  # 带出哪一列
 # 列序数标签（第N列 = 表内真实列顺序，Excel 序数口径）
 from ui.helpers import ordered_columns  # noqa: E402
