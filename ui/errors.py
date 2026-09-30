@@ -10,6 +10,8 @@ MESSAGES = {
     "lock_timeout": "表正被其他操作占用，稍等 10 秒再试",
     "type_cast": "两边字段内容类型对不上（一边是数字一边是文字），换一个对应列试试",
     "zero_match": "按现在的对应关系一个都没对上，检查两边勾选的字段是不是配错了",
+    "backup_failed": "备份没建成，已中止 —— 你的数据没动。稍后重试",
+    "update_zero": "表结构刚变过，一条都没更新到，已中止。刷新页面后重新执行",
 }
 
 
@@ -17,13 +19,14 @@ def humanize(exc) -> str:
     code = getattr(exc, "code", None)
     if code and code in MESSAGES:
         return MESSAGES[code].format(d=getattr(exc, "detail", ""))
+    name, msg = type(exc).__name__, str(exc)
+    # 锁/超时必须先于 OperationalError 判断（QueryCanceledError 是它的子类）
+    if any(k in msg.lower() for k in ("lock timeout", "deadlock", "lock wait")) or "Lock" in name:
+        return MESSAGES["lock_timeout"]
     if isinstance(exc, (psycopg2.OperationalError, ConnectionError)):
         return MESSAGES["conn_failed"]
-    if "lock" in str(exc).lower() or "Lock" in type(exc).__name__:
-        return MESSAGES["lock_timeout"]
-    msg = str(exc)
-    if "UndefinedFunction" in type(exc).__name__ or "invalid input syntax" in msg:
+    if "UndefinedFunction" in name or "invalid input syntax" in msg:
         return MESSAGES["type_cast"]
-    if "does not exist" in msg:
-        return MESSAGES["col_missing"].format(d=msg.split('"')[1] if '"' in msg else msg)
+    if "does not exist" in msg and '"' in msg:
+        return MESSAGES["col_missing"].format(d=msg.split('"')[1])
     return f"出了点问题：{msg}"

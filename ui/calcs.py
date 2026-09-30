@@ -7,7 +7,7 @@ from engine.ops import backup_name, dry_run, validate, vlookup_multihit, writeba
 
 from . import store
 from .errors import humanize
-from .helpers import df_to_xlsx, default_target, distinct_values, read_df
+from .helpers import default_target, distinct_values, read_df, ui_tables
 
 STEPS = {
     "count": ["选主表", "选对照表", "对应字段", "统计范围", "写到哪一列", "可选筛选", "确认执行"],
@@ -119,8 +119,7 @@ def _validate_step(w: dict) -> str:
 
 def _step_body(w: dict, conn):
     kind, tables = w["kind"], None
-    from engine.db import list_tables
-    tables = list_tables(conn)
+    tables = ui_tables(conn)
     step = STEPS[kind][w["step"]]
 
     if step == "选主表":
@@ -256,13 +255,14 @@ def _execute(w: dict, conn, plans):
             elif spec["kind"] == "exists":
                 zero = dist.get("否", 0)
             else:
-                zero = int(df[spec["target_col"]].isna().sum()) if spec["target_col"] in df else 0
+                zero = dist.get(None, 0)
             multihit = vlookup_multihit(conn, spec) if spec["kind"] == "vlookup" else 0
             results.append({
                 "table": t, "target": spec["target_col"], "kind": spec["kind"],
                 "changed": st_wb["changed"], "backup": st_wb.get("backup"),
                 "guard_skipped": st_wb.get("guard_skipped", 0),
-                "zero": zero, "rows": len(df), "multihit": multihit, "df": df,
+                "zero": zero, "total": sum(dist.values()),
+                "rows": len(df), "multihit": multihit, "df": df,
             })
     except Exception as e:  # noqa: BLE001
         st.error(humanize(e))

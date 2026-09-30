@@ -103,7 +103,10 @@ def writeback(conn, spec, backup_name=None) -> dict:
         sql_type = target_sql_type(spec, info["s_cols"])
         _ensure_target(cur, spec["a_table"], spec["target_col"], sql_type, info["a_cols"])
         if backup_name:
-            cur.execute(f"CREATE TABLE {qi(backup_name)} AS TABLE {qi(spec['a_table'])}")
+            try:
+                cur.execute(f"CREATE TABLE {qi(backup_name)} AS TABLE {qi(spec['a_table'])}")
+            except Exception as e:  # noqa: BLE001
+                raise SpecError("backup_failed", str(e)) from e
             stats["backup"] = backup_name
         # 守卫行（垃圾总计行）的目标列置 NULL，不写入任何计算值（PRD §二）
         cur.execute(
@@ -114,6 +117,8 @@ def writeback(conn, spec, backup_name=None) -> dict:
             f"UPDATE {qi(spec['a_table'])} a SET {qi(spec['target_col'])} = {computed_expr(spec)} "
             f"WHERE {guard_pred(spec['pairs'])}"
         )
+        if cur.rowcount == 0:
+            raise SpecError("update_zero", spec["a_table"])
         guard = guard_pred(spec["pairs"])
         cur.execute(
             f"SELECT {qi(spec['target_col'])}::text, count(*) FROM {qi(spec['a_table'])} a "

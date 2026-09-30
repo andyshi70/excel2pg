@@ -1,11 +1,11 @@
 """入口：三栏布局（左=表列表/预览，中=操作向导，右=结果）。"""
 import streamlit as st
 
-from engine.db import get_conn, list_tables
+from engine.db import get_conn
 from ui import calcs, querycard, store
-from ui.errors import humanize
+from ui.errors import MESSAGES, humanize
 from ui.helpers import (columns, df_to_xlsx, distinct_values, missing_targets,
-                        table_head, table_shape)
+                        table_head, table_shape, ui_tables)
 
 CARDS = [
     ("query", "🔍 查数据", "只读：单表或连一张表查，条件随便加，不改数据库"),
@@ -39,16 +39,18 @@ def _results_right():
                 f"更新 {r['changed']} 行 · 显示 {r['rows']} 行 · "
                 f"跳过垃圾行 {r['guard_skipped']} 行"
             )
-            if r["kind"] == "count" and r["zero"]:
+            if r.get("backup"):
+                st.caption(f"备份表：{r['backup']}（需要恢复时可用它）")
+            if r.get("total") and r["zero"] >= r["total"]:
+                st.error(MESSAGES["zero_match"])
+            elif r["kind"] == "count" and r["zero"]:
                 st.warning(f"有 {r['zero']} 行算出来是 0 —— 对照表里一个都没数到，"
                            f"可能是这些方向/导师还没人录取，也可能是数据没覆盖，注意核对。")
-            if r["kind"] == "exists" and r["zero"]:
+            elif r["kind"] == "exists" and r["zero"]:
                 st.info(f"有 {r['zero']} 行结果是「否」（对照表里没找到）。"
                         f"如果这个数大得反常，检查一下两边字段配对。")
             if r.get("multihit"):
                 st.warning(f"对照表里有 {r['multihit']} 行都对上了（多行命中），只取了第一行的值。")
-            if r.get("backup"):
-                st.caption(f"备份表：{r['backup']}（需要恢复时可用它）")
             st.dataframe(r["df"], use_container_width=True, height=420)
             st.download_button(
                 "⬇ 下载结果 Excel（xlsx）", df_to_xlsx(r["df"]),
@@ -69,12 +71,12 @@ def _results_right():
 
 def main():
     st.set_page_config(page_title="yifan 数据小工具", page_icon="🗂️", layout="wide")
-    st.markdown("## 🗂️ yifan 数据小工具 —— 点一点，不用写公式和 SQL")
+    st.markdown("## 🗂️ yifan 数据小工具 —— 点一点，答案自己出来")
     for k, v in (("mode", None), ("results", None), ("wiz", None)):
         st.session_state.setdefault(k, v)
     try:
         conn = get_conn()
-        tables = list_tables(conn)
+        tables = ui_tables(conn)
     except Exception as e:  # noqa: BLE001
         st.error(humanize(e))
         return

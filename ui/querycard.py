@@ -1,11 +1,11 @@
 """查询卡片（PRD §四①）：只读，不回写。单/双表 + 三种连接大白话 + 多条件。"""
 import streamlit as st
 
-from engine.db import columns, list_tables, qi
+from engine.db import columns, qi
 from engine.match import pair_pred
 
 from .errors import humanize
-from .helpers import df_to_xlsx, distinct_values, read_df
+from .helpers import df_to_xlsx, distinct_values, read_df, ui_tables
 from .querysql import JOIN_LABELS, OP_BY_LABEL, OPS, build_query, count_sql
 
 LIMIT = 5001  # 多取 1 行用于判断是否超限
@@ -22,7 +22,7 @@ def _init():
 def render(conn):
     _init()
     q = st.session_state.q
-    tables = list_tables(conn)
+    tables = ui_tables(conn)
     st.caption("本查询只看不改数据库，随时查、随便试。")
 
     q["a"] = st.selectbox("从哪张表查？", tables,

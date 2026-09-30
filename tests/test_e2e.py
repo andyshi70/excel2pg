@@ -39,6 +39,17 @@ for need in ("🔍 查数据", "📋 补一列", "✅ 判断在不在", "🔢 �
     assert need in labels, f"缺少卡片 {need}: {labels}"
 print("[OK] 首页四张卡片齐全")
 
+# ---- AC4b 回归：用户可见文案不出现禁词
+ui_text = "\n".join(m.value for m in at.markdown) + "\n" + "\n".join(c.value for c in at.caption)
+for banned in ("SQL", "JOIN", "主键", "公式"):
+    assert banned not in ui_text, f"禁词 {banned} 出现在界面: {ui_text[:300]}"
+print("[OK] 首屏无 SQL/JOIN/主键/公式 禁词")
+
+# ---- 备份表不出现在左栏表列表
+sidebar_sel = next(s for s in at.selectbox if s.label == "点一张表看看")
+assert not any("_bak_" in o for o in sidebar_sel.options), sidebar_sel.options
+print(f"[OK] 左栏表列表已隐藏备份表（可见 {len(sidebar_sel.options)} 张）")
+
 # ---- 走「判断在不在」向导
 btn("✅ 判断在不在").click().run()
 assert not at.exception, at.exception

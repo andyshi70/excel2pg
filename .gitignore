@@ -1,7 +1,4 @@
 __pycache__/
 *.pyc
 .venv/
-__pycache__/
-*.pyc
-.venv/
 .ui_config.json

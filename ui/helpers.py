@@ -7,6 +7,11 @@ from engine import specs as S
 from engine.db import columns, connect, list_tables, qi
 
 
+def ui_tables(conn) -> list:
+    """界面上可见的表：过滤掉自动备份表（小白不该看见/操作它们）。"""
+    return [t for t in list_tables(conn) if "_bak_" not in t]
+
+
 def read_df(conn, sql, params=None) -> pd.DataFrame:
     cur = conn.cursor()
     cur.execute(sql, params)
@@ -74,7 +79,7 @@ def df_to_xlsx(df: pd.DataFrame) -> bytes:
 
 
 __all__ = [
-    "connect", "list_tables", "columns", "qi",
+    "connect", "list_tables", "ui_tables", "columns", "qi",
     "read_df", "table_head", "distinct_values", "table_shape",
     "missing_targets", "default_target", "df_to_xlsx",
 ]

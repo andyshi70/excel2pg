@@ -51,4 +51,15 @@ with connect() as conn:
         assert e.code == "no_pairs"
         print(f"[OK] 空配对拦截: {humanize(e)}")
 
+# 4) 错误映射：锁超时不得误报成"数据库没启动"；关键码必须存在（PRD §六）
+import psycopg2  # noqa: E402
+from ui.errors import MESSAGES  # noqa: E402
+
+assert "被其他操作占用" in humanize(psycopg2.OperationalError("canceling statement due to lock timeout"))
+assert "没启动" in humanize(psycopg2.OperationalError("could not connect to server: Connection refused"))
+assert "类型对不上" in humanize(psycopg2.errors.UndefinedFunction("operator does not exist: integer = text"))
+for code in ("zero_match", "backup_failed", "update_zero"):
+    assert code in MESSAGES, f"PRD §六 缺码 {code}"
+print("[OK] 错误映射：锁/连接/类型分流正确，PRD 10 码齐全")
+
 print("test_safety: ALL PASS")
