@@ -1,9 +1,15 @@
 # 主题锁定（taste-skill 审计项）：
-# - 内部数据工具，单一亮色主题显式锁定，不随 Streamlit 升级漂移
-# - 单一强调色（深青绿），白字对比度 ≈5.3:1 过 WCAG AA；不用默认红，不用 AI 紫
+# - 内部数据工具，单一亮色主题显式锁定，不随 Streamlit 卽级漂移
+# - 布局参考 aitoearn（侧栏 + 顶部 banner + 卡片网格），风格走简约版：
+#   中性底 + 单一紫罗兰强调（参考站 #A989FF 加深至 #6D4AF0，白字对比度 ≈5.4:1 过 WCAG AA）
+# - 形状规则：卡片/输入/按钮统一 14px（baseRadius），信息胶囊用全圆角
 [theme]
 base = "light"
-primaryColor = "#0F766E"
+primaryColor = "#6D4AF0"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F4F5"
+textColor = "#18181B"
+baseRadius = "14px"
 font = "sans serif"
 
 # 改代码保存后自动重启应用（根治"改了页面不生效"：不依赖浏览器提示/手动重启）

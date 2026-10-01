@@ -23,9 +23,87 @@ CARDS = [
     ("count", "🔢 数出现次数", "每个条目在明细表里出现几次，就填几（招了几个人）"),
 ]
 
+STYLE = """
+<style>
+/* ===== yifan 简约版（布局参考 aitoearn：侧栏 + 顶部 banner + 卡片网格） ===== */
+
+/* 侧栏：浅灰底、细分隔线、小号分区标题 */
+section[data-testid="stSidebar"] { background: #FAFAFA; border-right: 1px solid #E4E4E7; }
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
+  font-size: 12px; letter-spacing: .06em; color: #71717A;
+  font-weight: 600; margin: 1.3rem 0 .3rem;
+}
+.yf-brand { font-size: 15px; font-weight: 700; color: #18181B; letter-spacing: -.01em; margin-top: 2px; }
+.yf-brand span { display: block; font-size: 11.5px; font-weight: 500; color: #71717A; margin-top: 2px; }
+section[data-testid="stSidebar"] [data-testid="stButton"] button { font-size: 13.5px; padding: .45rem .8rem; }
+
+/* 顶部 banner（参考站 role-banner 位）：白卡 + 淡紫径向光 + 右侧信息胶囊 */
+.yf-banner {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  border: 1px solid #E4E4E7; border-radius: 20px; background: #FFFFFF;
+  padding: 20px 24px; margin: 0 0 4px; box-shadow: 0 1px 2px rgba(24,24,27,.05);
+}
+.yf-banner::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(640px 90px at 6% 0%, rgba(109,74,240,.07), transparent 72%);
+  pointer-events: none;
+}
+.yf-title { font-size: 19px; font-weight: 700; color: #18181B; letter-spacing: -.01em; }
+.yf-sub { font-size: 13px; color: #71717A; margin-top: 5px; }
+.yf-pills { display: flex; gap: 8px; flex-shrink: 0; position: relative; }
+.yf-pill {
+  border: 1px solid #E4E4E7; background: #FAFAFA; color: #3F3F46;
+  font-size: 12.5px; padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+}
+
+/* 首页卡片：带边框容器 = 卡；标题按钮变卡内大标题，描述在卡内 */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stMarkdownContainer"] .yf-carddesc) {
+  border: 1px solid #E4E4E7 !important; border-radius: 14px !important;
+  background: #FFFFFF; padding: 10px 12px 4px !important;
+  box-shadow: 0 1px 2px rgba(24,24,27,.04);
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stMarkdownContainer"] .yf-carddesc)
+    [data-testid="stButton"] button {
+  border: none !important; background: transparent !important; box-shadow: none !important;
+  text-align: left !important; font-size: 15.5px !important; font-weight: 650 !important;
+  color: #18181B !important; padding: 8px 8px 2px !important; min-height: auto !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stMarkdownContainer"] .yf-carddesc)
+    [data-testid="stButton"] button:hover {
+  color: #6D4AF0 !important; background: #F5F3FF !important; border-radius: 10px !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stMarkdownContainer"] .yf-carddesc)
+    [data-testid="stButton"] button:focus { box-shadow: none !important; }
+.yf-carddesc {
+  font-size: 12.5px !important; color: #71717A !important; line-height: 1.55 !important;
+  margin: 0 8px 8px !important;
+}
+/* 卡片网格：两张一排，列间距 */
+div[data-testid="stColumn"] [data-testid="stVerticalBlock"]:has(.yf-carddesc) { margin-bottom: 4px; }
+</style>
+"""
+
+
+def _style():
+    st.markdown(STYLE, unsafe_allow_html=True)
+
+
+def _banner(n_tables: int):
+    st.markdown(
+        f'<div class="yf-banner"><div><div class="yf-title">🗂️ yifan 数据小工具</div>'
+        f'<div class="yf-sub">点一点，答案自己出来 —— 选下面的卡片开跑，写回前会自动备份。</div></div>'
+        f'<div class="yf-pills"><span class="yf-pill">{n_tables} 张数据表</span>'
+        f'<span class="yf-pill">写回前自动备份</span></div></div>',
+        unsafe_allow_html=True,
+    )
+
 
 def _sidebar(tables, conn):
     with st.sidebar:
+        st.markdown('<div class="yf-brand">🗂️ yifan<span>数据小工具</span></div>', unsafe_allow_html=True)
         st.header("📁 数据表")
         if st.button("📥 导入 Excel 数据", use_container_width=True,
                      help="把要导入的 Excel 放进指定目录，点一下全部导入；同名表会被覆盖"):
@@ -116,7 +194,7 @@ def _results_right():
 
 def main():
     st.set_page_config(page_title="yifan 数据小工具", page_icon="🗂️", layout="wide")
-    st.markdown("## 🗂️ yifan 数据小工具 —— 点一点，答案自己出来")
+    _style()
     for k, v in (("mode", None), ("results", None), ("wiz", None)):
         st.session_state.setdefault(k, v)
     conn = None
@@ -131,6 +209,7 @@ def main():
         return
     try:
         _sidebar(tables, conn)
+        _banner(len(tables))
         miss = missing_targets(conn)
         if miss:
             st.warning(f"检测到表被重新导入过，之前算的结果没了：{'、'.join(miss)} —— "
@@ -159,14 +238,16 @@ def main():
                     for j in range(2):
                         kind, title, desc = CARDS[r * 2 + j]
                         with row[j]:
-                            if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
-                                calcs.set_conn(conn)
-                                st.session_state.mode = kind
-                                if kind != "query":
-                                    st.session_state.wiz = calcs.new_wiz(kind, tables)
-                                st.session_state.results = None
-                                st.rerun()
-                            st.caption(desc)
+                            with st.container(border=True):
+                                if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
+                                    calcs.set_conn(conn)
+                                    st.session_state.mode = kind
+                                    if kind != "query":
+                                        st.session_state.wiz = calcs.new_wiz(kind, tables)
+                                    st.session_state.results = None
+                                    st.rerun()
+                                st.markdown(f'<div class="yf-carddesc">{desc}</div>',
+                                            unsafe_allow_html=True)
         with right:
             _results_right()
     finally:
