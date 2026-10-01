@@ -118,6 +118,15 @@ def _sidebar(tables, conn):
                 st.code("\n".join(str(v) for v in vals[:60]) + ("\n…" if len(vals) > 60 else ""))
         baks = store.load().get("last_backups") or []
         if baks:
+            # cfg 只是历史索引，表可能已被轮换清理/手动删除 —— 只显示库里真实存在的
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename = ANY(%s)",
+                    (baks,),
+                )
+                live = {r[0] for r in cur.fetchall()}
+            baks = [b for b in baks if b in live]
+        if baks:
             with st.expander("🕘 最近的自动备份表（要恢复旧数据时用它们）"):
                 st.code("\n".join(baks[:10]))
 
