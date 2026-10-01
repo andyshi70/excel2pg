@@ -5,8 +5,8 @@ import streamlit as st
 
 from engine import specs as S
 from engine.db import columns, qi, table_exists
-from engine.ops import (backup_name, dry_run, explain_sql, validate,
-                        vlookup_multihit, writeback)
+from engine.ops import (KEEP_BACKUPS, backup_name, dry_run, explain_sql,
+                        prune_backups, validate, vlookup_multihit, writeback)
 
 from . import store
 from .errors import humanize
@@ -252,7 +252,7 @@ def _render_confirm(w: dict, conn):
         st.markdown(f"- {_summary_line(w, t, spec)}")
     if w.get("filter_col") and w.get("filter_values"):
         st.markdown(f"- 只显示「{w['filter_col']}」在这些值里的行（不影响计算）")
-    st.markdown("- 执行前每张表自动备份，随时可恢复")
+    st.markdown(f"- 执行前每张表自动备份（每表留最近 {KEEP_BACKUPS} 份，旧的自动清理），随时可恢复")
     for e in errors:
         st.error(e)
     if errors:
@@ -317,6 +317,15 @@ def _execute(w: dict, conn, plans):
         cfg = store.load()
         cfg["last_backups"] = (new_baks + cfg.get("last_backups", []))[:20]
         store.save(cfg)
+    # 备份防堆积：每表只留最近 KEEP_BACKUPS 份，旧的自动清理（失败不影响已完成的执行）
+    try:
+        dropped = prune_backups(conn)
+        if dropped:
+            cfg = store.load()
+            cfg["last_backups"] = [b for b in cfg.get("last_backups", []) if b not in dropped]
+            store.save(cfg)
+    except Exception:  # noqa: BLE001
+        logging.exception("prune_backups failed")
     st.session_state.results = results
     st.success(f"完成：{len(results)} 张表已写入。右侧查看结果。")
 

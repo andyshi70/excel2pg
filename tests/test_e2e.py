@@ -177,6 +177,19 @@ assert not any("回滚" in e.value for e in at.error), [e.value for e in at.erro
 print(f"[OK] 执行成功: {[(r['table'], r['target'], r['changed'], r['rows']) for r in res]}")
 assert any("完成" in s.value for s in at.success), [s.value for s in at.success]
 
+# ---- 备份防堆积：执行触发清理后，每张源表最多 KEEP_BACKUPS 份备份
+from collections import Counter
+from engine.ops import KEEP_BACKUPS
+with connect() as _c:
+    _cur = _c.cursor()
+    _cur.execute("SELECT table_name FROM information_schema.tables "
+                 "WHERE table_schema='public' AND table_name LIKE '%\\_bak\\_%'")
+    _baks = [r[0] for r in _cur.fetchall()]
+    _c.rollback()
+_cnt = Counter(n.split("_bak_", 1)[0] for n in _baks)
+assert _cnt and max(_cnt.values()) <= KEEP_BACKUPS, _cnt
+print(f"[OK] 备份自动清理：每表≤{KEEP_BACKUPS} 份（现存 {dict(_cnt)}）")
+
 # ---- 幂等：再跑一遍，changed 应为 0（值是行的纯函数）
 btn("↩ 回到首页，做下一个操作").click().run()
 btn("✅ 判断在不在").click().run()

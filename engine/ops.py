@@ -170,6 +170,30 @@ def backup_name(table: str) -> str:
     return f"{table}_bak_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
 
 
+KEEP_BACKUPS = 5  # 每张源表最多保留的备份数：防备份表无限堆积撑爆库（表都是千行级，5份足够回滚）
+
+
+def prune_backups(conn, keep=KEEP_BACKUPS) -> list:
+    """每张源表只留最近 keep 份备份，多余的 DROP。返回被清理的表名。"""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema='public' AND table_name LIKE '%\\_bak\\_%'"
+    )
+    by_src = {}
+    for (name,) in cur.fetchall():
+        by_src.setdefault(name.split("_bak_", 1)[0], []).append(name)
+    dropped = []
+    for names in by_src.values():
+        names.sort()  # 备份名内嵌时间戳 → 字典序 = 时间序
+        for old in (names[:-keep] if keep > 0 else names):
+            cur.execute(f"DROP TABLE {qi(old)}")
+            dropped.append(old)
+    if dropped:
+        conn.commit()
+    return dropped
+
+
 def vlookup_multihit(conn, spec) -> int:
     """vlookup 黄条：对照表命中>1 的主表行数（只读）。"""
     from .match import vlookup_multihit_sql
