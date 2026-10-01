@@ -15,3 +15,7 @@ font = "sans serif"
 # 改代码保存后自动重启应用（根治"改了页面不生效"：不依赖浏览器提示/手动重启）
 [server]
 runOnSave = true
+
+[client]
+# 藏右上角 Deploy + ⋮ 菜单（本地数据工具不需要部署入口）
+toolbarMode = "minimal"
