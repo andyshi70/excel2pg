@@ -48,6 +48,40 @@ if os.path.exists(cfg_path):
         _cfg.pop(_k, None)
     json.dump(_cfg, open(cfg_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
+# ---- 测试不留痕：记下开跑前的备份表，进程退出时删掉本次新产生的。
+# （测试每次真写回 4 组双表备份，不清理会把用户真备份挤出"每表留 5 份"窗口）
+import atexit  # noqa: E402
+from engine.db import connect, qi as _qi  # noqa: E402
+from ui import store as _store  # noqa: E402
+
+_BAK_SQL = ("SELECT tablename FROM pg_tables "
+            "WHERE schemaname='public' AND tablename LIKE '%\\_bak\\_%'")
+with connect() as _c:
+    _cur = _c.cursor()
+    _cur.execute(_BAK_SQL)
+    _BAKS_BEFORE = {_r[0] for _r in _cur.fetchall()}
+
+
+def _cleanup_test_backups():
+    try:
+        with connect() as _c:
+            _cur = _c.cursor()
+            _cur.execute(_BAK_SQL)
+            _new = {_r[0] for _r in _cur.fetchall()} - _BAKS_BEFORE
+            for _t in sorted(_new):
+                _cur.execute(f"DROP TABLE IF EXISTS {_qi(_t)}")
+            _c.commit()
+        if _new:
+            _cfg = _store.load()
+            _cfg["last_backups"] = [b for b in _cfg.get("last_backups", []) if b not in _new]
+            _store.save(_cfg)
+            print(f"[OK] 测试新产生的备份已清理: {sorted(_new)}")
+    except Exception as _e:  # noqa: BLE001
+        print(f"[WARN] 测试备份清理失败: {_e}")
+
+
+atexit.register(_cleanup_test_backups)
+
 # ---- 勾选顺序 = 配对顺序（独立新会话，不污染主流程）
 at2 = AppTest.from_file(os.path.join(ROOT, "app.py"), default_timeout=60)
 at2.run()
