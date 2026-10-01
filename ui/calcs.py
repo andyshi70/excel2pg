@@ -5,7 +5,8 @@ import streamlit as st
 
 from engine import specs as S
 from engine.db import columns, qi, table_exists
-from engine.ops import backup_name, dry_run, validate, vlookup_multihit, writeback
+from engine.ops import (backup_name, dry_run, explain_sql, validate,
+                        vlookup_multihit, writeback)
 
 from . import store
 from .errors import humanize
@@ -260,6 +261,9 @@ def _render_confirm(w: dict, conn):
         try:
             d = dry_run(conn, spec)
             st.caption(f"「{t}」：将更新 {d['changed']} 行；垃圾行跳过 {d['guard_skipped']} 行")
+            with st.expander(f"「{t}」· 看看将要执行的 SQL（可复制去别处核对）"):
+                st.code(";\n".join(explain_sql(spec)), language="sql")
+                st.caption("上面就是点「确认执行」后真正跑的语句；执行前还会先自动备份整张表。")
         except Exception as e:  # noqa: BLE001
             logging.exception("dry_run failed")
             st.error(f"「{t}」：{humanize(e)}")

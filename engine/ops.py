@@ -94,6 +94,26 @@ def dry_run(conn, spec) -> dict:
     return {"changed": changed, "cleared": cleared, "guard_skipped": skipped}
 
 
+def _update_sql(spec) -> tuple:
+    """(先执行的清空语句, 后执行的写入语句)。writeback 与确认页展示共用同一来源，零漂移。"""
+    guard = guard_pred(spec["pairs"])
+    tgt = qi(spec["target_col"])
+    clear = (
+        f"UPDATE {qi(spec['a_table'])} a SET {tgt} = NULL "
+        f"WHERE NOT ({guard}) AND {tgt} IS NOT NULL"
+    )
+    main = (
+        f"UPDATE {qi(spec['a_table'])} a SET {tgt} = {computed_expr(spec)} "
+        f"WHERE {guard}"
+    )
+    return clear, main
+
+
+def explain_sql(spec) -> list:
+    """确认执行页展示用：writeback 真正会跑的两条 UPDATE。只读，不碰库。"""
+    return list(_update_sql(spec))
+
+
 def writeback(conn, spec, backup_name=None) -> dict:
     """单事务写回（PRD §五）。with conn: 异常自动 ROLLBACK，原表零改动。"""
     stats = dry_run(conn, spec)
@@ -109,14 +129,9 @@ def writeback(conn, spec, backup_name=None) -> dict:
                 raise SpecError("backup_failed", str(e)) from e
             stats["backup"] = backup_name
         # 守卫行（垃圾总计行）的目标列置 NULL，不写入任何计算值（PRD §二）
-        cur.execute(
-            f"UPDATE {qi(spec['a_table'])} a SET {qi(spec['target_col'])} = NULL "
-            f"WHERE NOT ({guard_pred(spec['pairs'])}) AND {qi(spec['target_col'])} IS NOT NULL"
-        )
-        cur.execute(
-            f"UPDATE {qi(spec['a_table'])} a SET {qi(spec['target_col'])} = {computed_expr(spec)} "
-            f"WHERE {guard_pred(spec['pairs'])}"
-        )
+        clear_sql, main_sql = _update_sql(spec)
+        cur.execute(clear_sql)
+        cur.execute(main_sql)
         if cur.rowcount == 0:
             raise SpecError("update_zero", spec["a_table"])
         guard = guard_pred(spec["pairs"])

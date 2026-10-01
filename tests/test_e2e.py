@@ -163,6 +163,9 @@ text = "\n".join(m.value for m in at.markdown)
 assert "即将做的事" in text and "判断" in text and "自动备份" in text, text[:500]
 assert "将更新" in "\n".join(c.value for c in at.caption), "缺少 dry_run 预演数字"
 print("[OK] 步6 人话确认页 + dry_run 预演")
+_sql = "\n".join(c.value for c in at.code)
+assert "UPDATE" in _sql and "WHERE" in _sql and "推免目录开放情况" in _sql, _sql[:400]
+print("[OK] 确认页可查看将执行的 SQL（UPDATE…WHERE，含目标列）")
 
 btn("确认执行").click().run()
 assert not at.exception, at.exception
