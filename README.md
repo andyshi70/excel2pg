@@ -23,4 +23,4 @@ Excel 一键进库，按 `excel名_sheet名` 自动建表，同名表覆盖重�
 Excel ──excel2pg──▶ PostgreSQL(yifan 库) ◀──读写── YIfan WebUI
 ```
 
-导入层负责把 Excel 变成表；WebUI 负在此之上查数、算数、写回。
+导入层负责把 Excel 变成表；WebUI 负责在此之上查数、算数、写回。
