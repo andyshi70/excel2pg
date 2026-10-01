@@ -9,8 +9,8 @@ from engine.ops import backup_name, dry_run, validate, vlookup_multihit, writeba
 
 from . import store
 from .errors import humanize
-from .helpers import (default_target, distinct_values, order_clause,
-                      ordered_columns, read_df, ui_tables)
+from .helpers import (checkbox_multi, default_target, distinct_values,
+                      order_clause, ordered_columns, read_df, ui_tables)
 
 STEPS = {
     "count": ["选主表", "选对照表", "对应字段", "统计范围", "写到哪一列", "可选筛选", "确认执行"],
@@ -35,38 +35,6 @@ MODE_PHRASE = {
     "loose": "（按宽松规则比对：忽略空格、大小写、全半角）",
     "contains": "（按包含规则比对：一边包含另一边就算对上）",
 }
-
-
-def _toggle_order(order_key, ck, opt):
-    """勾/取消勾时维护勾选顺序（顺序 = 配对顺序）。"""
-    order = st.session_state.get(order_key, [])
-    if st.session_state.get(ck):
-        if opt not in order:
-            order.append(opt)
-    else:
-        order = [o for o in order if o != opt]
-    st.session_state[order_key] = order
-
-
-def checkbox_multi(label, options, selected, key):
-    """两栏勾选框多选：列表常驻直接勾，不用反复开下拉。返回勾选顺序列表（= 配对顺序）。"""
-    st.caption(label)
-    order_key, prefix = f"{key}__order", f"{key}::"
-    # 换过字段集（切表）→ 旧勾选作废，按预填重建
-    if st.session_state.get(f"{key}__sig") != tuple(options):
-        for k in [k for k in st.session_state if k.startswith(prefix)]:
-            st.session_state.pop(k)
-        st.session_state.pop(order_key, None)
-        st.session_state[f"{key}__sig"] = tuple(options)
-        st.session_state[order_key] = [o for o in selected if o in options]
-    order = st.session_state.setdefault(order_key, [])
-    cols = st.columns(2)
-    for i, opt in enumerate(options):
-        ck = f"{prefix}{opt}"
-        st.session_state.setdefault(ck, opt in order)
-        with cols[i % 2]:
-            st.checkbox(opt, key=ck, on_change=_toggle_order, args=(order_key, ck, opt))
-    return [o for o in order if o in options]
 
 
 def new_wiz(kind: str, tables: list) -> dict:
@@ -174,7 +142,7 @@ def _step_body(w: dict, conn):
 
     if step == "选主表":
         st.caption("要对哪张表动手？可以多选，每张表各算一遍，最后一次确认全部执行。")
-        w["a_tables"] = st.multiselect("主表", tables, default=w["a_tables"])
+        w["a_tables"] = checkbox_multi("主表", tables, w["a_tables"], "pmain")
     elif step == "选对照表":
         opts = [t for t in tables if t not in w["a_tables"]]
         if not opts:
@@ -219,8 +187,8 @@ def _step_body(w: dict, conn):
         vals = distinct_values(conn, w["src"], w["status_col"])
         prefer = [v for v in ["录取", "专项录取"] if v in vals]
         saved = [v for v in (w["status_values"] or []) if v in vals]
-        w["status_values"] = st.multiselect(
-            "只数哪些状态的人？（默认只数正式录取的）", vals, default=saved or prefer or vals[:1],
+        w["status_values"] = checkbox_multi(
+            "只数哪些状态的人？（默认只数正式录取的）", vals, saved or prefer or vals[:1], "pstatus",
             help="把候补、未录取也算上会把数字抬高；你以前的口径 = 只数录取+专项录取。",
         )
     elif step == "带出哪一列":
@@ -264,7 +232,7 @@ def _step_body(w: dict, conn):
             w["filter_col"] = sel
             vals = distinct_values(conn, w["a_tables"][0], sel)
             saved = [v for v in w["filter_values"] if v in vals]
-            w["filter_values"] = st.multiselect(f"只显示「{sel}」为这些值的行", vals, default=saved)
+            w["filter_values"] = checkbox_multi(f"只显示「{sel}」为这些值的行", vals, saved, "pfilter")
     elif step == "确认执行":
         _render_confirm(w, conn)
 

@@ -19,13 +19,6 @@ def btn(label):
     raise AssertionError(f"按钮没找到: {label}  现有: {[b.label for b in at.button]}")
 
 
-def ms(label):
-    for m in at.multiselect:
-        if m.label == label:
-            return m
-    raise AssertionError(f"多选没找到: {label}  现有: {[m.label for m in at.multiselect]}")
-
-
 def sb(label):
     for s in at.selectbox:
         if s.label == label:
@@ -43,6 +36,17 @@ def tick(prefix, cols):
             box.set_value(True).run()
             assert not at.exception, at.exception
 
+
+# 重置向导预填，隔离用户手工配置（结束时本测试会把预填写成两表齐的默认态）。
+# 必须在任何 AppTest 启动前弹掉，否则用户预填会污染下面的独立会话 at2。
+import json  # noqa: E402
+
+cfg_path = os.path.join(ROOT, ".ui_config.json")
+if os.path.exists(cfg_path):
+    _cfg = json.load(open(cfg_path, encoding="utf-8"))
+    for _k in ("exists", "count", "vlookup"):
+        _cfg.pop(_k, None)
+    json.dump(_cfg, open(cfg_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
 # ---- 勾选顺序 = 配对顺序（独立新会话，不污染主流程）
 at2 = AppTest.from_file(os.path.join(ROOT, "app.py"), default_timeout=60)
@@ -98,16 +102,6 @@ else:
 # ---- 记录「开放情况」两列的初始状态（规则：默认放空，只有判断卡片会碰它）
 from engine.db import connect, qi  # noqa: E402
 
-# 重置向导预填，隔离用户手工配置（结束时本测试会把预填写成两表齐的默认态）
-import json  # noqa: E402
-
-cfg_path = os.path.join(ROOT, ".ui_config.json")
-if os.path.exists(cfg_path):
-    _cfg = json.load(open(cfg_path, encoding="utf-8"))
-    for _k in ("exists", "count", "vlookup"):
-        _cfg.pop(_k, None)
-    json.dump(_cfg, open(cfg_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-
 
 def open_state():
     with connect() as c:
@@ -137,7 +131,7 @@ def assert_code_sorted(df, table, label):
 btn("✅ 判断在不在").click().run()
 assert not at.exception, at.exception
 assert any("第 1/6 步：选主表" in s.value for s in at.subheader), [s.value for s in at.subheader]
-assert ms("主表").value == ["硕士", "直博"], ms("主表").value
+assert at.session_state.get("pmain__order") == ["硕士", "直博"], at.session_state.get("pmain__order")
 print("[OK] 步1 主表预填 硕士+直博")
 
 btn("下一步 →").click().run()
@@ -210,10 +204,8 @@ cb.set_value(True).run()
 assert not at.exception, at.exception
 sb("连哪张表？").set_value("总0924").run()
 assert not at.exception, at.exception
-ms("左边：硕士 的字段（按顺序对应）").set_value(["学位类型", "专业码", "研究方向", "指导教师"])
-ms("右边：总0924 的字段（按顺序对应左边）").set_value(
-    ["录取类型", "录取专业代码", "录取研究方向（2027年目录方向）", "导师姓名"]
-).run()
+tick("qcol_a", ["学位类型", "专业码", "研究方向", "指导教师"])
+tick("qcol_b", ["录取类型", "录取专业代码", "录取研究方向（2027年目录方向）", "导师姓名"])
 assert not at.exception, at.exception
 next(b for b in at.button if b.label == "+ 加一个条件").click().run()
 assert not at.exception, at.exception
@@ -236,8 +228,7 @@ tick("pcol_a", ["学位类型", "专业码", "研究方向", "指导教师"])
 tick("pcol_b", ["录取类型", "录取专业代码", "录取研究方向（2027年目录方向）", "导师姓名"])
 btn("下一步 →").click().run()  # 统计范围（默认 录取+专项录取）
 assert not at.exception, at.exception
-sv = next(m for m in at.multiselect if m.label.startswith("只数哪些状态"))
-assert sv.value == ["录取", "专项录取"], sv.value
+assert at.session_state.get("pstatus__order") == ["录取", "专项录取"], at.session_state.get("pstatus__order")
 btn("下一步 →").click().run()  # 写到哪一列
 btn("下一步 →").click().run()  # 可选筛选
 btn("下一步 →").click().run()  # 确认

@@ -7,8 +7,8 @@ from engine.db import columns, qi
 from engine.match import pair_pred
 
 from .errors import humanize
-from .helpers import (df_to_xlsx, distinct_values, order_clause,
-                      ordered_columns, read_df, ui_tables)
+from .helpers import (checkbox_multi, df_to_xlsx, distinct_values,
+                      order_clause, ordered_columns, read_df, ui_tables)
 from .querysql import JOIN_LABELS, OP_BY_LABEL, OPS, build_query, count_sql
 
 LIMIT = 5001  # 多取 1 行用于判断是否超限
@@ -43,10 +43,10 @@ def render(conn):
         q["join"] = st.radio("两张表怎么连？", list(JOIN_LABELS), format_func=lambda k: JOIN_LABELS[k],
                              index=list(JOIN_LABELS).index(q["join"]), horizontal=False)
         left_common = a_cols
-        q["a_cols"] = st.multiselect(f"左边：{q['a']} 的字段（按顺序对应）", left_common,
-                                     default=[c for c in q["a_cols"] if c in left_common])
-        q["b_cols"] = st.multiselect(f"右边：{q['b']} 的字段（按顺序对应左边）", b_cols,
-                                     default=[c for c in q["b_cols"] if c in b_cols])
+        q["a_cols"] = checkbox_multi(f"左边：{q['a']} 的字段（按顺序对应）", left_common,
+                                     [c for c in q["a_cols"] if c in left_common], "qcol_a")
+        q["b_cols"] = checkbox_multi(f"右边：{q['b']} 的字段（按顺序对应左边）", b_cols,
+                                     [c for c in q["b_cols"] if c in b_cols], "qcol_b")
         if len(q["a_cols"]) != len(q["b_cols"]) or not q["a_cols"]:
             st.warning("两边字段数量要一样多，按顺序一一对应。")
         elif q["a_cols"]:
@@ -81,8 +81,8 @@ def render(conn):
                 ref = f"{side}.{qi(col)}"
                 pool = distinct_values(conn, q[side], col) if not cond.get("_pool") else cond["_pool"]
                 cond["_pool"] = pool
-                picked = st.multiselect("值（多选）" if i == 0 else "", pool,
-                                        default=[v for v in vals if v in pool], key=f"cval{i}")
+                picked = checkbox_multi("值（多选）" if i == 0 else "", pool,
+                                        [v for v in vals if v in pool], f"cval{i}", columns=1)
                 cond.update(side=side, col=col, op=op, vals=picked)
             elif op == "between":
                 v1 = st.text_input("从" if i == 0 else "", value=str(vals[0]) if len(vals) > 0 else "", key=f"cv1{i}")

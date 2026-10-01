@@ -1,10 +1,45 @@
-"""读库辅助：预览、去重值、结果集、xlsx。全部只读除 writeback 外。"""
+"""读库与界面辅助：预览、去重值、结果集、xlsx、勾选框多选。全部只读除 writeback 外。"""
 import io
 
 import pandas as pd
+import streamlit as st
 
 from engine import specs as S
 from engine.db import columns, connect, list_tables, qi
+
+
+def _toggle_order(order_key, ck, opt):
+    """勾/取消勾时维护勾选顺序（顺序 = 配对顺序）。"""
+    order = st.session_state.get(order_key, [])
+    if st.session_state.get(ck):
+        if opt not in order:
+            order.append(opt)
+    else:
+        order = [o for o in order if o != opt]
+    st.session_state[order_key] = order
+
+
+def checkbox_multi(label, options, selected, key, help=None, columns=2):
+    """勾选框多选（替代多选下拉）：列表常驻直接勾，不用反复开下拉。返回勾选顺序列表。"""
+    st.caption(label)
+    if help:
+        st.caption(help)
+    order_key, prefix = f"{key}__order", f"{key}::"
+    # 换过选项集（切表/切列）→ 旧勾选作废，按预填重建
+    if st.session_state.get(f"{key}__sig") != tuple(options):
+        for k in [k for k in st.session_state if k.startswith(prefix)]:
+            st.session_state.pop(k)
+        st.session_state.pop(order_key, None)
+        st.session_state[f"{key}__sig"] = tuple(options)
+        st.session_state[order_key] = [o for o in selected if o in options]
+    order = st.session_state.setdefault(order_key, [])
+    cols = st.columns(columns)
+    for i, opt in enumerate(options):
+        ck = f"{prefix}{opt}"
+        st.session_state.setdefault(ck, opt in order)
+        with cols[i % columns]:
+            st.checkbox(opt, key=ck, on_change=_toggle_order, args=(order_key, ck, opt))
+    return [o for o in order if o in options]
 
 
 def ui_tables(conn) -> list:
