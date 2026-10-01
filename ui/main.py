@@ -148,17 +148,20 @@ def main():
             else:
                 st.markdown("### 想做什么？选一个")
                 st.caption("四张卡片，点卡片进入向导，一步一步走，最后确认才真正改表。")
-                row = st.columns(2)
-                for i, (kind, title, desc) in enumerate(CARDS):
-                    with row[i % 2]:
-                        if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
-                            calcs.set_conn(conn)
-                            st.session_state.mode = kind
-                            if kind != "query":
-                                st.session_state.wiz = calcs.new_wiz(kind, tables)
-                            st.session_state.results = None
-                            st.rerun()
-                        st.caption(desc)
+                # 每行独立一排 columns：同一行两张卡从同一条基线开始（塞一个 columns 轮流填会错行）
+                for r in range(2):
+                    row = st.columns(2)
+                    for j in range(2):
+                        kind, title, desc = CARDS[r * 2 + j]
+                        with row[j]:
+                            if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
+                                calcs.set_conn(conn)
+                                st.session_state.mode = kind
+                                if kind != "query":
+                                    st.session_state.wiz = calcs.new_wiz(kind, tables)
+                                st.session_state.results = None
+                                st.rerun()
+                            st.caption(desc)
         with right:
             _results_right()
     finally:
