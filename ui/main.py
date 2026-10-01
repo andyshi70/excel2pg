@@ -27,8 +27,11 @@ STYLE = """
 <style>
 /* ===== YIfan 简约版（侧栏导航 + 卡片网格，内容贴顶、无 banner） ===== */
 
-/* 内容顶到置顶：藏空 header、收紧主区上边距 */
-header[data-testid="stHeader"] { display: none; }
+/* 顶部：header 瘦身（Deploy/菜单由 toolbarMode=minimal 处理；侧栏展开钮 stExpandSidebarButton
+   就在 header 里，绝不能再整块 display:none，否则侧栏收起后永远打不开） */
+header[data-testid="stHeader"] {
+  padding: 4px 16px 0 !important; min-height: 0 !important; background: transparent !important;
+}
 div.block-container { padding-top: 1.2rem !important; padding-bottom: 1.2rem; }
 /* 首标题与侧栏品牌 YIfan 同一水平线（36px = CDP 实测中心差） */
 .yf-title-row { margin-top: 36px !important; }
