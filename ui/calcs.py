@@ -6,7 +6,8 @@ import streamlit as st
 from engine import specs as S
 from engine.db import columns, qi, table_exists
 from engine.ops import (KEEP_BACKUPS, backup_name, dry_run, explain_sql,
-                        prune_backups, validate, vlookup_multihit, writeback)
+                        prune_backups, sample_sql, validate, vlookup_multihit,
+                        writeback)
 
 from . import store
 from .errors import humanize
@@ -292,6 +293,11 @@ def _execute(w: dict, conn, plans):
             if oc:  # 全量展示按代码排序
                 df_sql += f" ORDER BY {oc}"
             df = read_df(conn, df_sql, params or None)
+            try:  # 抽样核对样本（只读，失败不阻塞执行结果）
+                sample = read_df(conn, sample_sql(spec))
+            except Exception:  # noqa: BLE001
+                logging.exception("sample_check failed")
+                sample = None
             dist = dict(st_wb["distribution"])
             if spec["kind"] == "count":
                 zero = dist.get("0", 0)
@@ -305,7 +311,7 @@ def _execute(w: dict, conn, plans):
                 "changed": st_wb["changed"], "backup": st_wb.get("backup"),
                 "guard_skipped": st_wb.get("guard_skipped", 0),
                 "zero": zero, "total": sum(dist.values()),
-                "rows": len(df), "multihit": multihit, "df": df,
+                "rows": len(df), "multihit": multihit, "df": df, "sample": sample,
             })
     except Exception as e:  # noqa: BLE001
         logging.exception("writeback failed")

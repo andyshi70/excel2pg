@@ -91,6 +91,11 @@ def _results_right():
             if r.get("multihit"):
                 st.warning(f"对照表里有 {r['multihit']} 行都对上了（多行命中），只取了第一行的值。")
             st.dataframe(r["df"], use_container_width=True, height=420)
+            if r.get("sample") is not None and len(r["sample"]):
+                with st.expander("🔍 抽样核对（随机 10 行：匹配键 → 库里现值 —— 打开原 Excel 抽对几行）"):
+                    st.dataframe(r["sample"], use_container_width=True, height=320)
+                    st.caption("对法：拿这几行的匹配键回你原来的 Excel，用同样的算法（数次数 / 判断 / VLOOKUP）查一遍 —— "
+                               "对上即结果正确；「对照表」「对侧带出值」列显示的是命中那行的原值。")
             st.download_button(
                 "⬇ 下载结果 Excel（xlsx）", df_to_xlsx(r["df"]),
                 file_name=f"{r['table']}_{r['target']}.xlsx",

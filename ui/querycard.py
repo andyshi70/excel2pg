@@ -132,9 +132,16 @@ def render(conn):
             df = read_df(conn, sql, params)
             csql, cparams = count_sql(spec, a_cols, bcols)
             total = read_df(conn, csql, cparams).iloc[0, 0]
+            try:  # 展示用：把参数内联进 SQL，用户可复制去任何工具复跑核对（不执行）
+                with conn.cursor() as _mc:
+                    shown = _mc.mogrify(sql, params).decode() if params else sql
+                conn.rollback()
+            except Exception:  # noqa: BLE001
+                shown = sql
             st.session_state.q_result = {
                 "df": df.head(LIMIT - 1), "total": int(total),
                 "title": f"{q['a']}" + (f" ⋈ {q['b']}" if q["use_b"] else ""),
+                "sql": shown,
             }
         except Exception as e:  # noqa: BLE001
             logging.exception("query failed")
@@ -145,6 +152,10 @@ def render_result(res):
     """右栏渲染查询结果。"""
     st.markdown(f"### 查询结果：{res['title']}")
     st.caption(f"共 {res['total']} 行" + ("（只显示前 5000 行，下载是全量）" if res["total"] > len(res["df"]) else ""))
+    if res.get("sql"):
+        with st.expander("🔎 看本次查询的 SQL（可复制去任何数据库工具复跑核对）"):
+            st.code(res["sql"], language="sql")
+            st.caption(f"原样复跑这条 SQL，行数应等于 {res['total']} —— 对上即查询无误。")
     st.dataframe(res["df"], use_container_width=True, height=520)
     st.download_button("⬇ 下载 Excel（xlsx）", df_to_xlsx(res["df"]),
                        file_name=f"查询结果.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

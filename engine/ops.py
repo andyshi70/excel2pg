@@ -2,7 +2,8 @@
 from datetime import datetime
 
 from .db import columns, qi, qstr, table_exists
-from .match import count_subquery, exists_subquery, guard_pred, vlookup_subquery
+from .match import (count_subquery, exists_subquery, guard_pred, pair_pred,
+                    vlookup_subquery)
 
 
 class SpecError(Exception):
@@ -112,6 +113,23 @@ def _update_sql(spec) -> tuple:
 def explain_sql(spec) -> list:
     """确认执行页展示用：writeback 真正会跑的两条 UPDATE。只读，不碰库。"""
     return list(_update_sql(spec))
+
+
+def sample_sql(spec, n=10) -> str:
+    """抽样核对（只读）：匹配键 →（vlookup）对侧命中行与带出值 → 库里现值，随机 n 行。"""
+    guard = guard_pred(spec["pairs"])
+    sel = [f"a.{qi(c)} AS {qi(c)}" for c, _ in spec["pairs"]]
+    join = ""
+    if spec["kind"] == "vlookup":
+        pred = pair_pred(spec["pairs"], "a", "m",
+                         spec.get("normalize", True), spec.get("strip_digits", False),
+                         spec.get("match_mode", "exact"))
+        sel += [f"m.{qi(s)} AS {qi(s + '（对照表）')}" for _, s in spec["pairs"]]
+        sel.append(f"m.{qi(spec['fill_col'])} AS {qi('对侧带出值')}")
+        join = f" LEFT JOIN {qi(spec['src_table'])} m ON {pred}"
+    sel.append(f"a.{qi(spec['target_col'])} AS {qi('库里现值')}")
+    return (f"SELECT {', '.join(sel)} FROM {qi(spec['a_table'])} a{join} "
+            f"WHERE {guard} ORDER BY random() LIMIT {n}")
 
 
 def writeback(conn, spec, backup_name=None) -> dict:

@@ -177,6 +177,13 @@ assert not any("回滚" in e.value for e in at.error), [e.value for e in at.erro
 print(f"[OK] 执行成功: {[(r['table'], r['target'], r['changed'], r['rows']) for r in res]}")
 assert any("完成" in s.value for s in at.success), [s.value for s in at.success]
 
+# ---- 抽样核对样本（AC：匹配键+库里现值，可拿 Excel 抽对）
+for r in res:
+    _s = r.get("sample")
+    assert _s is not None and "库里现值" in _s.columns and len(_s) > 0, \
+        (_s.columns.tolist() if _s is not None else None)
+print("[OK] 抽样核对样本已生成（匹配键 + 库里现值，随机10行）")
+
 # ---- 备份防堆积：执行触发清理后，每张源表最多 KEEP_BACKUPS 份备份
 from collections import Counter
 from engine.ops import KEEP_BACKUPS
@@ -233,6 +240,11 @@ assert not at.exception, at.exception
 qr2 = at.session_state.get("q_result")
 assert qr2 and qr2["total"] == 134, qr2  # 与 tests/test_query.py 手工 SQL 一致
 print(f"[OK] 连表+条件查询: total={qr2['total']}（=手写 SQL 基准 134）")
+# ---- 查询附带参数已内联的 SQL（AC：可复制到任何工具复跑核对）
+assert qr2.get("sql", "").lstrip().upper().startswith("SELECT"), qr2.get("sql", "")[:80]
+assert "华山医院" in qr2["sql"], qr2["sql"][:300]  # 条件值已内联，非 %s 占位
+assert "%s" not in qr2["sql"], qr2["sql"][:300]
+print("[OK] 查询结果附参数已内联的 SQL（复制复跑即可对行数）")
 
 # ---- 「数出现次数」向导（7 步，幂等执行）
 btn("← 回到首页").click().run()
@@ -301,6 +313,13 @@ rv = at.session_state["results"]
 assert len(rv) == 2 and all(r["kind"] == "vlookup" for r in rv), rv
 assert all(r["target"] == "测试带出列" for r in rv), rv
 print(f"[OK] vlookup 执行: {[(r['table'], r['changed'], r['rows']) for r in rv]}")
+
+# ---- vlookup 抽样核对：含对侧命中键与带出值（连接路径专属）
+for r in rv:
+    _vs = r.get("sample")
+    assert _vs is not None and "对侧带出值" in _vs.columns and "库里现值" in _vs.columns, \
+        (_vs.columns.tolist() if _vs is not None else None)
+print("[OK] vlookup 抽样核对含 对侧键/对侧带出值/库里现值")
 
 # 清理：删测试列 + vlookup 预填配置（不动用户真实列）
 with connect() as c:
