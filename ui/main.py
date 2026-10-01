@@ -1,4 +1,4 @@
-"""入口：三栏布局（左=表列表/预览+导入Excel，中=操作向导，右=结果）。"""
+"""入口：双区布局（左=侧栏导航/表列表/导入Excel，右=主区：操作在上、结果显示正下方）。"""
 import logging
 import subprocess
 import sys
@@ -147,7 +147,7 @@ def _sidebar(tables, conn):
                 st.code("\n".join(baks[:10]))
 
 
-def _results_right():
+def _results():
     res = st.session_state.get("results")
     if res:
         for r in res:
@@ -187,9 +187,6 @@ def _results_right():
             st.rerun()
     elif st.session_state.get("mode") == "query" and st.session_state.get("q_result"):
         querycard.render_result(st.session_state.q_result)
-    else:
-        st.caption("结果会显示在这里。")
-        st.caption("👆 先在中间点一张卡片开跑；执行结果、提示和 Excel 下载都会出现在这一栏。")
 
 
 def main():
@@ -215,41 +212,39 @@ def main():
             st.warning(f"检测到表被重新导入过，之前算的结果没了：{'、'.join(miss)} —— "
                        f"回到首页对应卡片重跑一次即可（配置会自动带出）。")
 
-        mid, right = st.columns([6, 5])
-        with mid:
-            if st.session_state.mode == "query":
-                if st.button("← 回到首页"):
-                    st.session_state.mode = None
-                    st.rerun()
-                querycard.render(conn)
-            elif st.session_state.mode in ("count", "exists", "vlookup"):
-                calcs.set_conn(conn)
-                if st.button("← 回到首页"):
-                    st.session_state.mode = None
-                    st.session_state.wiz = None
-                    st.rerun()
-                calcs.render(conn)
-            else:
-                st.markdown("### 想做什么？选一个")
-                st.caption("四张卡片，点卡片进入向导，一步一步走，最后确认才真正改表。")
-                # 每行独立一排 columns：同一行两张卡从同一条基线开始（塞一个 columns 轮流填会错行）
-                for r in range(2):
-                    row = st.columns(2)
-                    for j in range(2):
-                        kind, title, desc = CARDS[r * 2 + j]
-                        with row[j]:
-                            with st.container(border=True):
-                                if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
-                                    calcs.set_conn(conn)
-                                    st.session_state.mode = kind
-                                    if kind != "query":
-                                        st.session_state.wiz = calcs.new_wiz(kind, tables)
-                                    st.session_state.results = None
-                                    st.rerun()
-                                st.markdown(f'<div class="yf-carddesc">{desc}</div>',
-                                            unsafe_allow_html=True)
-        with right:
-            _results_right()
+        if st.session_state.mode == "query":
+            if st.button("← 回到首页"):
+                st.session_state.mode = None
+                st.rerun()
+            querycard.render(conn)
+        elif st.session_state.mode in ("count", "exists", "vlookup"):
+            calcs.set_conn(conn)
+            if st.button("← 回到首页"):
+                st.session_state.mode = None
+                st.session_state.wiz = None
+                st.rerun()
+            calcs.render(conn)
+        else:
+            st.markdown("### 想做什么？选一个")
+            st.caption("四张卡片，点卡片进入向导，一步一步走，最后确认才真正改表。")
+            # 每行独立一排 columns：同一行两张卡从同一条基线开始（塞一个 columns 轮流填会错行）
+            for r in range(2):
+                row = st.columns(2)
+                for j in range(2):
+                    kind, title, desc = CARDS[r * 2 + j]
+                    with row[j]:
+                        with st.container(border=True):
+                            if st.button(f"{title}", key=f"card_{kind}", use_container_width=True):
+                                calcs.set_conn(conn)
+                                st.session_state.mode = kind
+                                if kind != "query":
+                                    st.session_state.wiz = calcs.new_wiz(kind, tables)
+                                st.session_state.results = None
+                                st.rerun()
+                            st.markdown(f'<div class="yf-carddesc">{desc}</div>',
+                                        unsafe_allow_html=True)
+        # 单栏布局：操作在上，结果显示正下方（不再分左右）
+        _results()
     finally:
         conn.close()
 

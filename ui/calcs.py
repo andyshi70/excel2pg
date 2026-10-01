@@ -333,7 +333,7 @@ def _execute(w: dict, conn, plans):
     except Exception:  # noqa: BLE001
         logging.exception("prune_backups failed")
     st.session_state.results = results
-    st.success(f"完成：{len(results)} 张表已写入。右侧查看结果。")
+    st.success(f"完成：{len(results)} 张表已写入。结果已显示在下方。")
 
 
 def render(conn):

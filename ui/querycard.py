@@ -149,7 +149,7 @@ def render(conn):
 
 
 def render_result(res):
-    """右栏渲染查询结果。"""
+    """渲染查询结果（显示在查询表单下方）。"""
     st.markdown(f"### 查询结果：{res['title']}")
     st.caption(f"共 {res['total']} 行" + ("（只显示前 5000 行，下载是全量）" if res["total"] > len(res["df"]) else ""))
     if res.get("sql"):
