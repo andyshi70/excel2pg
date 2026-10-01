@@ -30,16 +30,19 @@ STYLE = """
 /* 内容顶到置顶：藏空 header、收紧主区上边距 */
 header[data-testid="stHeader"] { display: none; }
 div.block-container { padding-top: 1.2rem !important; padding-bottom: 1.2rem; }
+/* 首标题贴顶：与侧栏品牌 YIfan 同一水平线 */
+div.block-container > div[data-testid="stVerticalBlock"]
+    > div[data-testid="stMarkdownContainer"]:first-child h3 { margin-top: 0 !important; }
 
-/* 侧栏：浅灰底、细分隔线、小号分区标题 */
-section[data-testid="stSidebar"] { background: #FAFAFA; border-right: 1px solid #E4E4E7; }
+/* 侧栏：浅灰底、细分隔线、小号分区标题（25rem 保证 30px 品牌一行放下） */
+section[data-testid="stSidebar"] { background: #FAFAFA; border-right: 1px solid #E4E4E7; width: 25rem !important; }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2,
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
   font-size: 12px; letter-spacing: .06em; color: #71717A;
   font-weight: 600; margin: 1.3rem 0 .3rem;
 }
-.yf-brand { font-size: 15px; font-weight: 700; color: #18181B; letter-spacing: -.01em; margin: 2px 0 4px; }
+.yf-brand { font-size: 30px; font-weight: 700; color: #18181B; letter-spacing: -.02em; margin: 0 0 6px; white-space: nowrap; }
 section[data-testid="stSidebar"] [data-testid="stButton"] button { font-size: 13.5px; padding: .45rem .8rem; }
 
 /* 首页卡片：带边框容器 = 卡；标题按钮变卡内大标题，描述在卡内 */
