@@ -1,0 +1,6 @@
+# yifan WebUI 依赖（阶段1-3 验证过的组合，Python 3.14）
+streamlit==1.64.0
+psycopg2-binary==2.9.13
+pandas==3.0.6
+openpyxl==3.1.5
+python-dotenv==1.2.3
