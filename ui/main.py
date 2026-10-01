@@ -30,9 +30,8 @@ STYLE = """
 /* 内容顶到置顶：藏空 header、收紧主区上边距 */
 header[data-testid="stHeader"] { display: none; }
 div.block-container { padding-top: 1.2rem !important; padding-bottom: 1.2rem; }
-/* 首标题贴顶：与侧栏品牌 YIfan 同一水平线 */
-div.block-container > div[data-testid="stVerticalBlock"]
-    > div[data-testid="stMarkdownContainer"]:first-child h3 { margin-top: 0 !important; }
+/* 首标题与侧栏品牌 YIfan 同一水平线（36px = CDP 实测中心差） */
+.yf-title-row { margin-top: 36px !important; }
 
 /* 侧栏：浅灰底、细分隔线、小号分区标题（25rem 保证 30px 品牌一行放下） */
 section[data-testid="stSidebar"] { background: #FAFAFA; border-right: 1px solid #E4E4E7; width: 25rem !important; }
@@ -200,7 +199,7 @@ def main():
                 st.rerun()
             calcs.render(conn)
         else:
-            st.markdown("### 想做什么？选一个")
+            st.markdown('<h3 class="yf-title-row">想做什么？选一个</h3>', unsafe_allow_html=True)
             st.caption("四张卡片，点卡片进入向导，一步一步走，最后确认才真正改表。")
             # 每行独立一排 columns：同一行两张卡从同一条基线开始（塞一个 columns 轮流填会错行）
             for r in range(2):
